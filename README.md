@@ -4,21 +4,26 @@ FastAPI + PostgreSQL API for Hangil's Seoul Station / AREX guidance: sessions, t
 
 Contracts follow *API·시퀀스 설계 v0.3* with the changes in *시스템·AI 설계서 v0.2* (street view, `/messages` photo upload, `tip` / `unverified_notes`). The OpenAPI document is served at `/api/v1/docs`.
 
+This repo holds code only. Map data and photos live in [oneload-data](https://github.com/team-onetruck/oneload-data); the server setup and deploy script live in [oneload-infra](https://github.com/team-onetruck/oneload-infra).
+
 ## Run locally
 
+Clone oneload-data next to this repo (the default `MAP_DIR` is `../oneload-data/maps`):
+
 ```sh
-docker compose up -d --wait          # Postgres 17 + pgvector on 127.0.0.1:54329 (also creates hangil_test)
+git clone https://github.com/team-onetruck/oneload-data ../oneload-data
+docker compose up -d --wait          # Postgres 17 + pgvector on 127.0.0.1:54329
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload # http://127.0.0.1:8000/api/v1/docs
 ```
 
 ```sh
-uv run pytest            # uses the hangil_test database; override with TEST_DATABASE_URL
+uv run pytest            # creates and uses hangil_test; override with TEST_DATABASE_URL
 uv run ruff check . && uv run ruff format .
 ```
 
-Settings come from environment variables or `.env` (see `app/config.py`): `DATABASE_URL`, `CORS_ORIGINS`, limits and TTLs.
+Settings come from environment variables or `.env` (see `app/config.py`): `DATABASE_URL`, `MAP_DIR`, `CORS_ORIGINS`, limits and TTLs.
 
 ## Layout
 
@@ -28,9 +33,9 @@ Settings come from environment variables or `.env` (see `app/config.py`): `DATAB
 | `app/domain/` | Pure logic, no I/O: map model, session state machine, routing, sign-text location matcher |
 | `app/ai/` | Contracts with the AI modules (`contracts.py`), the output guard, and today's stand-ins |
 | `app/middleware.py` | Request id + JSON access log, `Idempotency-Key` handling |
+| `app/openapi.py` | Korean Swagger texts, tags and the documented `Idempotency-Key` header |
 | `app/models.py`, `migrations/` | Tables and Alembic migrations |
-| `data/maps/` | Map files, loaded at startup and validated (unknown node references fail the boot) |
-| `deploy/macserver/` | Deploy script, Caddyfile and launchd agents for the demo server |
+| `tests/fixtures/maps/` | Frozen copy of the Seoul Station map, so survey updates never change test outcomes |
 
 ## AI modules: what is real today
 
@@ -43,22 +48,19 @@ Settings come from environment variables or `.env` (see `app/config.py`): `DATAB
 
 Swapping one in is a change to `create_app()` defaults in `app/main.py`; no endpoint changes.
 
-## Map data
+## CI and deploy
 
-`data/maps/seoul-station.json`. Only the floors of the AREX ticket points (express B2, all-stop B3) and platforms (B7) are confirmed, from the [AREX official guide](https://www.airportrailroad.com/co/steUsfGud.do) on 2026-10-22. Node positions, passages, distances, headings, sign texts and panoramas are placeholders until the field survey; the panoramas are CC0 photos of other stations. Bump `version` whenever the file changes, so clients holding the old map get `409 MAP_VERSION_MISMATCH`.
+`.github/workflows/ci.yml` runs lint and tests on every push, then checks that the current oneload-data still loads with this code. On `main` the `deploy` job runs on the self-hosted runner on macserver, checks out this repo, oneload-infra and oneload-data, and runs `macserver/deploy.sh` from oneload-infra (details in that repo).
 
-## Deploy
+Redeploy without a code change (after editing data, infra or a secret):
 
-Every push to `main` runs lint and tests on GitHub, then the `deploy` job runs `deploy/macserver/deploy.sh` on the self-hosted runner on macserver (label `hangil`). It syncs the code to `~/hangil-api`, starts Postgres with Docker (Colima), migrates, and (re)loads two launchd agents:
-
-- `com.onetruck.hangil-api`: uvicorn on `127.0.0.1:8000`, logs in `~/Library/Logs/hangil-api.log`
-- `com.onetruck.hangil-caddy`: Caddy on `127.0.0.1:4173`, serving the web client from `~/hangil-demo/dist` and proxying `/api/*` to the API
-
-Tailscale Funnel exposes Caddy at `https://baki-macbookpro.tail3286a4.ts.net:10000/` (API under `/api/v1`).
+```sh
+gh workflow run ci.yml -R team-onetruck/oneload-backend
+```
 
 ### Settings and secrets
 
-Server settings live only in **GitHub repository secrets**. The deploy step in `.github/workflows/ci.yml` maps each secret to an `APP_*` variable (`APP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}`), and `deploy.sh` writes every non-empty one to `~/hangil-api.env` on macserver (mode 600, prefix removed, previous file replaced). The API reads that file at start-up. Never edit it by hand or commit a value.
+Server settings live only in **GitHub repository secrets** of this repo. The deploy step maps each one to an `APP_*` variable (`APP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}`), and the deploy script writes every non-empty one to `~/hangil-api.env` on macserver (mode 600, prefix removed, previous file replaced). Never edit that file by hand or commit a value.
 
 ```sh
 gh secret set OPENAI_API_KEY -R team-onetruck/oneload-backend   # prompts for the value

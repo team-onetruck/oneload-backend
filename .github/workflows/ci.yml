@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch: # redeploy after changing a secret: gh workflow run ci.yml
+  workflow_dispatch: # redeploy after changing a secret, oneload-data or oneload-infra: gh workflow run ci.yml
 
 jobs:
   test:
@@ -28,18 +28,37 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run pytest -q
+      # Checked out after linting so ruff never sees the data repo's own tooling.
+      - uses: actions/checkout@v4
+        with:
+          repository: team-onetruck/oneload-data
+          path: oneload-data
+      - name: Current oneload-data loads with this code
+        run: |
+          uv run python -c "from pathlib import Path; from app.domain.mapdata import MapStore; \
+          print([m.map_id + '@' + m.version for m in MapStore.load(Path('oneload-data/maps')).all()])"
 
   deploy:
     needs: test
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    # Self-hosted runner on macserver, registered to this repo with the "hangil" label.
+    # Self-hosted runner on macserver, registered to this private repo only (label "hangil").
     runs-on: [self-hosted, macOS, hangil]
     concurrency:
       group: deploy-macserver
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
-      - run: deploy/macserver/deploy.sh
+        with:
+          path: backend
+      - uses: actions/checkout@v4
+        with:
+          repository: team-onetruck/oneload-infra
+          path: infra
+      - uses: actions/checkout@v4
+        with:
+          repository: team-onetruck/oneload-data
+          path: data
+      - run: infra/macserver/deploy.sh backend data
         env:
           # Server settings: one repository secret per line, exposed to deploy.sh with an APP_ prefix.
           # Add a line here when the API needs a new setting; an unset secret is simply skipped.

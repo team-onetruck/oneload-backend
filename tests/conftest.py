@@ -8,6 +8,7 @@ os.environ["DATABASE_URL"] = os.environ.get(
 import uuid  # noqa: E402
 from collections.abc import Iterator  # noqa: E402
 from dataclasses import dataclass, field  # noqa: E402
+from pathlib import Path  # noqa: E402
 from typing import Any  # noqa: E402
 
 import pytest  # noqa: E402
@@ -15,18 +16,31 @@ from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from httpx import Response  # noqa: E402
-from sqlalchemy import text  # noqa: E402
+from sqlalchemy import create_engine, make_url, text  # noqa: E402
 
-from app.config import ROOT, get_settings  # noqa: E402
+from app.config import ROOT  # noqa: E402
 from app.db import engine  # noqa: E402
 from app.domain.localization import VisionFeatures  # noqa: E402
 from app.domain.mapdata import MapData, MapStore  # noqa: E402
 from app.main import create_app  # noqa: E402
 
+# A frozen copy of the Seoul Station map, so survey updates in oneload-data never change test outcomes.
+FIXTURE_MAPS = Path(__file__).parent / "fixtures" / "maps"
+
+
+def _ensure_test_database() -> None:
+    url = make_url(os.environ["DATABASE_URL"])
+    admin = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    with admin.connect() as conn:
+        if conn.scalar(text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": url.database}) is None:
+            conn.execute(text(f'CREATE DATABASE "{url.database}"'))
+    admin.dispose()
+
 
 @pytest.fixture(scope="session", autouse=True)
 def _schema() -> None:
     """Build the test schema with the real migrations, so the migration itself is tested too."""
+    _ensure_test_database()
     with engine.begin() as conn:
         conn.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public;"))
     command.upgrade(Config(str(ROOT / "alembic.ini")), "head")
@@ -39,8 +53,13 @@ def _clean_tables() -> None:
 
 
 @pytest.fixture(scope="session")
-def seoul() -> MapData:
-    return MapStore.load(get_settings().map_dir).get("seoul-station")
+def map_store() -> MapStore:
+    return MapStore.load(FIXTURE_MAPS)
+
+
+@pytest.fixture(scope="session")
+def seoul(map_store: MapStore) -> MapData:
+    return map_store.get("seoul-station")
 
 
 class FakeVision:
@@ -115,9 +134,9 @@ class Api:
 
 
 @pytest.fixture
-def api() -> Iterator[Api]:
+def api(map_store: MapStore) -> Iterator[Api]:
     vision = FakeVision()
-    with TestClient(create_app(vision=vision)) as http:
+    with TestClient(create_app(map_store=map_store, vision=vision)) as http:
         yield Api(http=http, vision=vision)
 
 
