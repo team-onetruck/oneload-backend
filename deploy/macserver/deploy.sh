@@ -3,7 +3,7 @@
 # safe to run by hand from a checkout on the server too.
 #
 #   ~/hangil-api        application code + .venv
-#   ~/hangil-api.env    server-only settings and secrets (e.g. OPENAI_API_KEY), never in git
+#   ~/hangil-api.env    generated from GitHub repository secrets on every deploy; never edit it by hand
 #   ~/hangil-demo/      web client build (oneload-app) + Caddyfile, served on 127.0.0.1:4173
 set -euo pipefail
 export PATH="/opt/homebrew/bin:$PATH"
@@ -15,6 +15,21 @@ AGENTS="$HOME/Library/LaunchAgents"
 DOMAIN="gui/$(id -u)"
 
 rsync -a --delete --exclude .git --exclude .venv --exclude .env "$SRC/" "$APP/"
+
+# Settings and secrets come only from GitHub repository secrets (gh secret set NAME): the workflow passes
+# them as JSON and every one except GITHUB_TOKEN is written to $ENV_FILE, replacing what was there.
+# A manual run without REPO_SECRETS keeps the current file.
+if [[ -n "${REPO_SECRETS:-}" ]]; then
+  (umask 077 && /usr/bin/python3 - "$ENV_FILE" <<'PY'
+import json, os, sys
+secrets = json.loads(os.environ["REPO_SECRETS"])
+lines = [f"{name}={json.dumps(value)}" for name, value in sorted(secrets.items()) if name.lower() != "github_token"]
+with open(sys.argv[1], "w") as env_file:
+    env_file.write("".join(f"{line}\n" for line in lines))
+PY
+  )
+  echo "Wrote $(grep -c . "$ENV_FILE" || true) variable(s) from repository secrets"
+fi
 touch "$ENV_FILE" && chmod 600 "$ENV_FILE"
 cd "$APP"
 

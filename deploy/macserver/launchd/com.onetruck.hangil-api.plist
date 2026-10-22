@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- __HOME__ is replaced by deploy.sh. Secrets (e.g. OPENAI_API_KEY) go in __HOME__/hangil-api.env, never here. -->
+<!-- __HOME__ is replaced by deploy.sh. Settings and secrets reach the app through __HOME__/hangil-api.env,
+     which deploy.sh writes from GitHub repository secrets; never put them here. -->
 <plist version="1.0">
   <dict>
     <key>Label</key>

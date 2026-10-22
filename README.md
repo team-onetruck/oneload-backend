@@ -54,4 +54,15 @@ Every push to `main` runs lint and tests on GitHub, then the `deploy` job runs `
 - `com.onetruck.hangil-api`: uvicorn on `127.0.0.1:8000`, logs in `~/Library/Logs/hangil-api.log`
 - `com.onetruck.hangil-caddy`: Caddy on `127.0.0.1:4173`, serving the web client from `~/hangil-demo/dist` and proxying `/api/*` to the API
 
-Tailscale Funnel exposes Caddy at `https://baki-macbookpro.tail3286a4.ts.net:10000/` (API under `/api/v1`). Server-only settings and secrets such as `OPENAI_API_KEY` go in `~/hangil-api.env` on macserver, never in the repo.
+Tailscale Funnel exposes Caddy at `https://baki-macbookpro.tail3286a4.ts.net:10000/` (API under `/api/v1`).
+
+### Settings and secrets
+
+Server settings live only in **GitHub repository secrets**. On every deploy, each secret (except `GITHUB_TOKEN`) is written to `~/hangil-api.env` on macserver, mode 600, replacing the previous file, and the API reads it at start-up. Never edit that file by hand or commit a value.
+
+```sh
+gh secret set OPENAI_API_KEY -R team-onetruck/oneload-backend   # prompts for the value
+gh workflow run ci.yml -R team-onetruck/oneload-backend          # redeploy so the API picks it up
+```
+
+Removing a secret and redeploying removes it from the server as well.

@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch: # redeploy after changing a secret: gh workflow run ci.yml
 
 jobs:
   test:
@@ -30,7 +31,7 @@ jobs:
 
   deploy:
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     # Self-hosted runner on macserver, registered to this repo with the "hangil" label.
     runs-on: [self-hosted, macOS, hangil]
     concurrency:
@@ -39,3 +40,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: deploy/macserver/deploy.sh
+        env:
+          # Every repository secret becomes an environment variable of the API on macserver.
+          REPO_SECRETS: ${{ toJSON(secrets) }}
