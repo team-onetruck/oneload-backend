@@ -3,7 +3,8 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import Depends, Header, Path, Request
+from fastapi import Depends, Path, Request, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.datastructures import UploadFile
@@ -38,17 +39,21 @@ AgentDep = Annotated[Agent, Depends(get_agent)]
 VisionDep = Annotated[VisionExtractor, Depends(get_vision)]
 
 
+# Declared as a security scheme so Swagger UI shows an "Authorize" button for the session token.
+_bearer = HTTPBearer(auto_error=False, scheme_name="sessionToken", description="session_token from POST /sessions")
+
+
 def authorized_session(
     db: Db,
     session_id: Annotated[str, Path()],
-    authorization: Annotated[str | None, Header()] = None,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Security(_bearer)] = None,
 ) -> SessionRow:
     """Resolve the bearer token to its session and lock the row for the rest of the request.
 
     The row lock serialises concurrent requests on one session, so revision checks and state
     transitions never interleave.
     """
-    token = authorization.removeprefix("Bearer ").strip() if authorization else ""
+    token = credentials.credentials if credentials else ""
     if not token:
         raise ApiError(ErrorCode.SESSION_UNAUTHORIZED, "A session token is required.")
     row = db.scalar(select(SessionRow).where(SessionRow.token_hash == sha256_hex(token)).with_for_update())

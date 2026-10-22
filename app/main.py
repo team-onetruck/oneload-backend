@@ -11,6 +11,7 @@ from app.config import get_settings
 from app.domain.mapdata import MapStore
 from app.errors import install_error_handlers
 from app.middleware import IdempotencyMiddleware, RequestContextMiddleware
+from app.openapi import install_openapi
 
 API_PREFIX = "/api/v1"
 
@@ -37,6 +38,7 @@ def create_app(
     for module in (health, sessions, maps, conversation, location, routes):
         app.include_router(module.router, prefix=API_PREFIX)
     install_error_handlers(app)
+    install_openapi(app)
 
     # Starlette runs the last-added middleware first: CORS → request id/logging → idempotency.
     app.add_middleware(IdempotencyMiddleware)

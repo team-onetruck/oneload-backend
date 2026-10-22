@@ -44,4 +44,3 @@ jobs:
           # Server settings: one repository secret per line, exposed to deploy.sh with an APP_ prefix.
           # Add a line here when the API needs a new setting; an unset secret is simply skipped.
           APP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          APP_HANGIL_DEPLOY_CHECK: ${{ secrets.HANGIL_DEPLOY_CHECK }}
