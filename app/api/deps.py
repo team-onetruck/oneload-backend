@@ -40,7 +40,9 @@ VisionDep = Annotated[VisionExtractor, Depends(get_vision)]
 
 
 # Declared as a security scheme so Swagger UI shows an "Authorize" button for the session token.
-_bearer = HTTPBearer(auto_error=False, scheme_name="sessionToken", description="session_token from POST /sessions")
+_bearer = HTTPBearer(
+    auto_error=False, scheme_name="sessionToken", description="`POST /sessions` 응답의 session_token을 붙여넣으세요"
+)
 
 
 def authorized_session(

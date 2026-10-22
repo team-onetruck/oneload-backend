@@ -21,24 +21,33 @@ from app.domain.localization import Hints, match_location, retake_hint
 from app.domain.session_state import State, Trigger, allows
 from app.errors import ApiError, ErrorCode
 from app.models import LocalizationRow
+from app.openapi import Tag
 from app.schemas import ConfirmationIn, ConfirmationOut, ConfirmedLocation, LocalizationOut
 from app.security import new_id
 
-router = APIRouter(tags=["location"])
+router = APIRouter(tags=[Tag.LOCATION])
 
 
-@router.post("/sessions/{session_id}/localizations")
+@router.post(
+    "/sessions/{session_id}/localizations",
+    summary="사진으로 위치 후보 찾기",
+    description=(
+        "안내판 사진에서 읽은 문구를 등록된 표지판과 비교해 위치 후보와 판단 근거(`evidence`)를 돌려줍니다."
+        " 위치를 자동으로 확정하지 않으며, 사용자가 `/location-confirmations`로 골라야 합니다."
+        " 후보가 없으면 `no_match`와 재촬영 안내(`retake_hint`)를 줍니다. 결과는 5분 뒤 만료됩니다."
+    ),
+)
 def localize(
     row: CurrentSession,
     db: Db,
     maps: Maps,
     vision: VisionDep,
-    image: Annotated[UploadFile, File(description="JPEG, ≤2 MB. Never stored.")],
-    map_version: Annotated[str, Form()],
-    floor_hint: Annotated[str | None, Form()] = None,
-    last_node_id: Annotated[str | None, Form()] = None,
+    image: Annotated[UploadFile, File(description="JPEG, 2MB 이하. 처리 후 바로 버리고 저장하지 않습니다.")],
+    map_version: Annotated[str, Form(description="앱이 가진 지도 버전. 서버와 다르면 409 MAP_VERSION_MISMATCH")],
+    floor_hint: Annotated[str | None, Form(description="사용자가 짐작한 층, 예: B1")] = None,
+    last_node_id: Annotated[str | None, Form(description="마지막으로 확정했던 노드")] = None,
 ) -> LocalizationOut:
-    """Photo → location candidates with evidence. Never confirms a location by itself (NFR-02)."""
+    # Never confirms a location by itself (NFR-02); the user picks via /location-confirmations.
     map_ = map_of(row, maps)
     check_map_version(map_, map_version)
     if not allows(State(row.state), Trigger.NO_MATCH):
@@ -75,9 +84,16 @@ def localize(
     )
 
 
-@router.post("/sessions/{session_id}/location-confirmations")
+@router.post(
+    "/sessions/{session_id}/location-confirmations",
+    summary="현재 위치 확정",
+    description=(
+        "사용자가 사진 후보 중 하나를 고르거나(`photo_candidate`, `localization_id` 필요)"
+        " 목록에서 직접 고르면(`manual`) 그때 위치가 정해집니다."
+        " 성공하면 ready_to_navigate가 되고 `/routes`를 부를 수 있습니다."
+    ),
+)
 def confirm_location(body: ConfirmationIn, row: CurrentSession, db: Db, maps: Maps) -> ConfirmationOut:
-    """The user picks a photo candidate or chooses their spot from a list; only then is a location set."""
     check_revision(row, body.expected_revision)
     map_ = map_of(row, maps)
     node = map_.node_by_id.get(body.selected_node_id)

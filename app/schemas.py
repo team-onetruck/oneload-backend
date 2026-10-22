@@ -1,17 +1,20 @@
 """Request and response bodies of the public REST API (API spec v0.3 §8 with system design v0.2 changes).
 
-The OpenAPI document at /docs is generated from these models, so this file is the contract the
+The OpenAPI document at /api/v1/docs is generated from these models, so this file is the contract the
 client team builds against.
 """
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.ai.contracts import AgentResponse
 from app.domain.localization import Candidate
 from app.domain.mapdata import Edge, Floor, Landmark, Lang, Node, Panorama, Position, Text, TrainType
+
+# Optimistic locking (API spec v0.3 §3): the revision the client last saw; a mismatch answers 409 REVISION_CONFLICT.
+ExpectedRevision = Annotated[int, Field(description="직전 응답의 session.revision. 다르면 409 REVISION_CONFLICT")]
 
 
 class SessionStatus(BaseModel):
@@ -29,8 +32,8 @@ class ClientInfo(BaseModel):
 
 
 class CreateSessionIn(BaseModel):
-    language: Lang
-    map_id: str
+    language: Lang = Field(description="안내 언어", examples=["ko"])
+    map_id: str = Field(description="`GET /maps`의 지도 id", examples=["seoul-station"])
     client: ClientInfo
 
 
@@ -45,14 +48,14 @@ class CreateSessionOut(BaseModel):
 
 
 class Preferences(BaseModel):
-    avoid_stairs: bool = False
+    avoid_stairs: bool = Field(default=False, description="계단이 없는 경로만 사용")
 
 
 class PatchSessionIn(BaseModel):
     # Destinations are only set through /messages, so unknown fields such as a destination are rejected.
     model_config = ConfigDict(extra="forbid")
 
-    expected_revision: int
+    expected_revision: ExpectedRevision
     language: Lang | None = None
     preferences: Preferences | None = None
 
@@ -80,10 +83,10 @@ class NavigationStateOut(BaseModel):
 
 class FeedbackIn(BaseModel):
     route_id: str | None = None
-    rating: int = Field(ge=1, le=5)
-    category: str = Field(max_length=32)
+    rating: int = Field(ge=1, le=5, description="만족도 1~5")
+    category: str = Field(max_length=32, description="예: wrong_direction, unclear_instruction, other")
     comment: str = Field(default="", max_length=2000)
-    allow_image_retention: bool = False
+    allow_image_retention: bool = Field(default=False, description="QA용 사진 7일 보관 동의")
 
 
 class FeedbackOut(BaseModel):
@@ -139,9 +142,9 @@ class PoisOut(BaseModel):
 
 
 class MessageIn(BaseModel):
-    message: str = Field(default="", max_length=1000)
-    language: Lang | None = None
-    selected_poi_id: str | None = None
+    message: str = Field(default="", max_length=1000, description="사용자 문장", examples=["돈은 어떻게 내요?"])
+    language: Lang | None = Field(default=None, description="이번 메시지부터 바꿀 언어 (선택)")
+    selected_poi_id: str | None = Field(default=None, description="목적지 버튼·목록에서 고른 POI id (선택)")
 
     @model_validator(mode="after")
     def _not_empty(self) -> "MessageIn":
@@ -170,12 +173,14 @@ class LocalizationOut(BaseModel):
 
 
 class ConfirmationIn(BaseModel):
-    expected_revision: int
+    expected_revision: ExpectedRevision
     # "marker" (API spec v0.3) belongs to the AR stage and is not accepted yet.
-    method: Literal["photo_candidate", "manual"]
-    localization_id: str | None = None
-    selected_node_id: str
-    selected_heading_deg: float | None = None
+    method: Literal["photo_candidate", "manual"] = Field(
+        description="photo_candidate: 사진 후보 중 선택 · manual: 목록에서 직접 선택"
+    )
+    localization_id: str | None = Field(default=None, description="photo_candidate일 때 `/localizations` 응답의 id")
+    selected_node_id: str = Field(description="사용자가 고른 위치 노드, 예: line4-gates", examples=["line4-gates"])
+    selected_heading_deg: float | None = Field(default=None, description="후보에 방향이 있으면 그 값")
 
     @model_validator(mode="after")
     def _photo_needs_localization(self) -> "ConfirmationIn":
@@ -207,12 +212,12 @@ class RouteStart(BaseModel):
 
 
 class RouteIn(BaseModel):
-    expected_revision: int
-    destination_poi_id: str
-    map_version: str
+    expected_revision: ExpectedRevision
+    destination_poi_id: str = Field(description="`/messages`에서 정해진 목적지와 같아야 합니다")
+    map_version: str = Field(description="앱이 가진 지도 버전")
     start: RouteStart = RouteStart()
-    preferences: Preferences | None = None
-    reroute: bool = False
+    preferences: Preferences | None = Field(default=None, description="비우면 세션에 저장된 선호를 씁니다")
+    reroute: bool = Field(default=False, description="길을 잃은 뒤 같은 목적지로 다시 계산할 때 true")
 
 
 class Waypoint(BaseModel):
@@ -252,14 +257,14 @@ NavigationEventType = Literal["navigation_started", "arrived", "navigation_cance
 
 
 class NavigationEvent(BaseModel):
-    event_id: str = Field(max_length=64)
-    type: NavigationEventType
+    event_id: str = Field(max_length=64, description="클라이언트가 만든 고유 id. 같은 id를 다시 보내면 무시합니다")
+    type: NavigationEventType = Field(description="navigation_started · arrived · navigation_cancelled")
     client_timestamp: datetime
     context: dict[str, Any] = {}
 
 
 class NavigationEventsIn(BaseModel):
-    route_id: str | None = None
+    route_id: str | None = Field(default=None, description="현재 경로 id (`/routes` 응답의 route_id)")
     events: list[NavigationEvent] = Field(min_length=1, max_length=50)
 
 

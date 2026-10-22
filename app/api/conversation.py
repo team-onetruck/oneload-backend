@@ -12,10 +12,11 @@ from app.config import get_settings
 from app.domain.session_state import Trigger
 from app.errors import ApiError, ErrorCode
 from app.models import MessageRow, SessionRow
+from app.openapi import Tag
 from app.schemas import MessageIn, MessageOut
 from app.security import new_id
 
-router = APIRouter(tags=["conversation"])
+router = APIRouter(tags=[Tag.CONVERSATION])
 
 _TRIGGER = {
     "answered": Trigger.ANSWERED,
@@ -55,7 +56,11 @@ _BODY_DOC = {
                     "type": "object",
                     "properties": {
                         **MessageIn.model_json_schema()["properties"],
-                        "image": {"type": "string", "format": "binary", "description": "JPEG, ≤2 MB"},
+                        "image": {
+                            "type": "string",
+                            "format": "binary",
+                            "description": "JPEG, 2MB 이하. 저장하지 않습니다.",
+                        },
                     },
                 }
             },
@@ -64,7 +69,18 @@ _BODY_DOC = {
 }
 
 
-@router.post("/sessions/{session_id}/messages", openapi_extra=_BODY_DOC)
+@router.post(
+    "/sessions/{session_id}/messages",
+    openapi_extra=_BODY_DOC,
+    summary="메시지 보내기 (핵심 진입점)",
+    description=(
+        '질문, 목적지 선택, "길을 잃었어요"가 모두 여기로 옵니다. 텍스트는 JSON으로, 사진을 붙일 때(예: 발매기 사진 +'
+        ' "뭘 눌러요?")는 multipart로 보냅니다. 버튼으로 목적지를 고르면 `selected_poi_id`를 함께 보냅니다.\n\n'
+        "응답의 `status`가 세션 상태를 바꿉니다: `needs_clarification`(추가 질문), `destination_set`(목적지 확정 →"
+        ' 위치가 없으면 needs_location), `relocalize`(위치 다시 확인). `unverified_notes`는 화면에 "확인되지 않음"으로'
+        " 구분해 보여줘야 합니다."
+    ),
+)
 def send_message(
     parsed: Annotated[tuple[MessageIn, bytes | None], Depends(read_message)],
     row: CurrentSession,
@@ -72,7 +88,6 @@ def send_message(
     maps: Maps,
     agent: AgentDep,
 ) -> MessageOut:
-    """Main entry point: questions, destination choices (selected_poi_id) and "I'm lost" all go through here."""
     body, image = parsed
     map_ = map_of(row, maps)
     if body.language:

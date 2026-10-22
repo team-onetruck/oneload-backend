@@ -6,6 +6,7 @@ from app.config import get_settings
 from app.domain.session_state import State, Trigger
 from app.errors import ApiError, ErrorCode
 from app.models import FeedbackRow, NavigationEventRow, RouteRow, SessionRow
+from app.openapi import Tag
 from app.schemas import (
     CreateSessionIn,
     CreateSessionOut,
@@ -21,10 +22,16 @@ from app.schemas import (
 )
 from app.security import new_id, new_session_token, sha256_hex
 
-router = APIRouter(tags=["sessions"])
+router = APIRouter(tags=[Tag.SESSIONS])
 
 
-@router.post("/sessions", status_code=201)
+@router.post(
+    "/sessions",
+    status_code=201,
+    summary="세션 생성",
+    description="앱을 열 때 한 번 호출합니다. 응답의 `session_token`을 이후 모든 세션 API에 Bearer 토큰으로 보냅니다."
+    " 2시간 동안 요청이 없으면 만료됩니다.",
+)
 def create_session(body: CreateSessionIn, db: Db, maps: Maps) -> CreateSessionOut:
     map_ = maps.get(body.map_id)
     if map_ is None:
@@ -55,7 +62,11 @@ def create_session(body: CreateSessionIn, db: Db, maps: Maps) -> CreateSessionOu
     )
 
 
-@router.patch("/sessions/{session_id}")
+@router.patch(
+    "/sessions/{session_id}",
+    summary="언어·이동 선호 변경",
+    description="언어와 계단 회피 같은 선호만 바꿉니다. 목적지는 바꿀 수 없고 `/messages`로만 지정합니다.",
+)
 def update_session(body: PatchSessionIn, row: CurrentSession) -> PatchSessionOut:
     check_revision(row, body.expected_revision)
     preferences_changed = body.preferences is not None and body.preferences.model_dump() != row.preferences
@@ -85,7 +96,12 @@ _NEXT_ACTION: dict[State, StateNextAction] = {
 }
 
 
-@router.get("/sessions/{session_id}/navigation-state")
+@router.get(
+    "/sessions/{session_id}/navigation-state",
+    summary="현재 진행 상태 조회",
+    description="앱 재시작이나 `REVISION_CONFLICT` 뒤에 상태를 다시 맞출 때 씁니다."
+    " `next_action`이 다음에 할 일을 알려줍니다.",
+)
 def navigation_state(row: CurrentSession, db: Db) -> NavigationStateOut:
     route = db.get(RouteRow, row.active_route_id) if row.active_route_id else None
     return NavigationStateOut(
@@ -99,9 +115,16 @@ def navigation_state(row: CurrentSession, db: Db) -> NavigationStateOut:
     )
 
 
-@router.post("/sessions/{session_id}/navigation-events")
+@router.post(
+    "/sessions/{session_id}/navigation-events",
+    summary="길안내 이벤트 보고",
+    description=(
+        "`navigation_started`(안내 시작 → navigating), `arrived`(도착 → arrived, 도착 지점이 새 현재 위치),"
+        " `navigation_cancelled`(취소 → idle)을 묶어서 보냅니다. 오프라인 동안 쌓인 이벤트를 한 번에 보내도 되고,"
+        " 같은 `event_id`는 한 번만 반영됩니다."
+    ),
+)
 def report_navigation_events(body: NavigationEventsIn, row: CurrentSession, db: Db, maps: Maps) -> NavigationEventsOut:
-    """Events arrive in batches because the client queues them while offline; event_id makes resends harmless."""
     if body.route_id and body.route_id != row.active_route_id:
         raise ApiError(
             ErrorCode.INVALID_INPUT, "route_id is not the active route.", {"active_route_id": row.active_route_id}
@@ -149,7 +172,12 @@ def report_navigation_events(body: NavigationEventsIn, row: CurrentSession, db: 
     return NavigationEventsOut(accepted_event_ids=ids, session=status_of(row))
 
 
-@router.post("/sessions/{session_id}/feedback", status_code=201)
+@router.post(
+    "/sessions/{session_id}/feedback",
+    status_code=201,
+    summary="피드백 보내기",
+    description="안내 만족도(1~5)와 오류 신고를 기록합니다. QA·평가(R6)에 쓰입니다.",
+)
 def send_feedback(body: FeedbackIn, row: CurrentSession, db: Db) -> FeedbackOut:
     feedback = FeedbackRow(id=new_id("fb"), session_id=row.id, **body.model_dump())
     db.add(feedback)

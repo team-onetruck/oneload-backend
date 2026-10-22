@@ -5,16 +5,24 @@ from app.domain.routing import plan_route
 from app.domain.session_state import Trigger
 from app.errors import ApiError, ErrorCode
 from app.models import RouteRow
+from app.openapi import Tag
 from app.schemas import Preferences, RouteIn, RouteOut, RouteStepOut, Waypoint
 from app.security import new_id
 
-router = APIRouter(tags=["routes"])
+router = APIRouter(tags=[Tag.ROUTES])
 
 
-@router.post("/sessions/{session_id}/routes")
+@router.post(
+    "/sessions/{session_id}/routes",
+    summary="경로 계산",
+    description=(
+        "확정된 현재 위치에서 세션 목적지까지, 등록된 통로만으로 단계별 경로를 만듭니다."
+        " 각 단계에는 거리뷰 사진(`pano_id`)과 그 사진 위 화살표 방향(`arrow_yaw_deg`)이 붙습니다."
+        " 목적지는 `/messages`에서 정해진 것과 같아야 하고, 길을 잃은 뒤 다시 계산할 때는 `reroute: true`를 보냅니다."
+    ),
+)
 def create_route(body: RouteIn, row: CurrentSession, db: Db, maps: Maps) -> RouteOut:
-    """Route from the confirmed location to the session's destination. Only the backend plans routes;
-    the agent can set a destination but never calls the route engine (API spec v0.3 §10)."""
+    # Only the backend plans routes; the agent can set a destination but never calls the route engine (spec v0.3 §10).
     check_revision(row, body.expected_revision)
     map_ = map_of(row, maps)
     check_map_version(map_, body.map_version)

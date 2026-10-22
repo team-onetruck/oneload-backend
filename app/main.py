@@ -25,7 +25,7 @@ def create_app(
 
     # Docs live under the API prefix so a reverse proxy can route /api/* to this app as a whole.
     app = FastAPI(
-        title="Hangil API",
+        title="한길 API",
         version="0.1.0",
         docs_url=f"{API_PREFIX}/docs",
         openapi_url=f"{API_PREFIX}/openapi.json",
