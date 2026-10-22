@@ -41,5 +41,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: deploy/macserver/deploy.sh
         env:
-          # Every repository secret becomes an environment variable of the API on macserver.
-          REPO_SECRETS: ${{ toJSON(secrets) }}
+          # Server settings: one repository secret per line, exposed to deploy.sh with an APP_ prefix.
+          # Add a line here when the API needs a new setting; an unset secret is simply skipped.
+          APP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          APP_HANGIL_DEPLOY_CHECK: ${{ secrets.HANGIL_DEPLOY_CHECK }}

@@ -58,11 +58,11 @@ Tailscale Funnel exposes Caddy at `https://baki-macbookpro.tail3286a4.ts.net:100
 
 ### Settings and secrets
 
-Server settings live only in **GitHub repository secrets**. On every deploy, each secret (except `GITHUB_TOKEN`) is written to `~/hangil-api.env` on macserver, mode 600, replacing the previous file, and the API reads it at start-up. Never edit that file by hand or commit a value.
+Server settings live only in **GitHub repository secrets**. The deploy step in `.github/workflows/ci.yml` maps each secret to an `APP_*` variable (`APP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}`), and `deploy.sh` writes every non-empty one to `~/hangil-api.env` on macserver (mode 600, prefix removed, previous file replaced). The API reads that file at start-up. Never edit it by hand or commit a value.
 
 ```sh
 gh secret set OPENAI_API_KEY -R team-onetruck/oneload-backend   # prompts for the value
 gh workflow run ci.yml -R team-onetruck/oneload-backend          # redeploy so the API picks it up
 ```
 
-Removing a secret and redeploying removes it from the server as well.
+A new setting needs the secret plus one mapping line in the workflow. Deleting a secret and redeploying removes it from the server.

@@ -16,19 +16,18 @@ DOMAIN="gui/$(id -u)"
 
 rsync -a --delete --exclude .git --exclude .venv --exclude .env "$SRC/" "$APP/"
 
-# Settings and secrets come only from GitHub repository secrets (gh secret set NAME): the workflow passes
-# them as JSON and every one except GITHUB_TOKEN is written to $ENV_FILE, replacing what was there.
-# A manual run without REPO_SECRETS keeps the current file.
-if [[ -n "${REPO_SECRETS:-}" ]]; then
+# Settings and secrets come only from GitHub repository secrets: the workflow maps each one to an APP_*
+# variable, and every non-empty APP_* is written to $ENV_FILE without the prefix, replacing the old file.
+# A manual run outside GitHub Actions keeps the current file.
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
   (umask 077 && /usr/bin/python3 - "$ENV_FILE" <<'PY'
 import json, os, sys
-secrets = json.loads(os.environ["REPO_SECRETS"])
-lines = [f"{name}={json.dumps(value)}" for name, value in sorted(secrets.items()) if name.lower() != "github_token"]
+settings = {k.removeprefix("APP_"): v for k, v in os.environ.items() if k.startswith("APP_") and v}
 with open(sys.argv[1], "w") as env_file:
-    env_file.write("".join(f"{line}\n" for line in lines))
+    env_file.write("".join(f"{name}={json.dumps(value)}\n" for name, value in sorted(settings.items())))
 PY
   )
-  echo "Wrote $(grep -c . "$ENV_FILE" || true) variable(s) from repository secrets"
+  echo "Wrote $(grep -c . "$ENV_FILE" || true) setting(s) from repository secrets"
 fi
 touch "$ENV_FILE" && chmod 600 "$ENV_FILE"
 cd "$APP"
