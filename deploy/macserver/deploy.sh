@@ -39,17 +39,28 @@ uv run --frozen --no-dev --env-file "$ENV_FILE" alembic upgrade head
 mkdir -p "$HOME/hangil-demo" "$AGENTS"
 cp deploy/macserver/Caddyfile "$HOME/hangil-demo/Caddyfile"
 
-reload_agent() {
+stop_agent() {
+  local label=$1
+  launchctl bootout "$DOMAIN/$label" 2>/dev/null || return 0
+  # bootout returns before the job is gone, and bootstrapping it again too early fails with EIO.
+  for _ in $(seq 40); do
+    launchctl print "$DOMAIN/$label" >/dev/null 2>&1 || return 0
+    sleep 0.25
+  done
+}
+
+start_agent() {
   local label=$1
   sed "s|__HOME__|$HOME|g" "deploy/macserver/launchd/$label.plist" > "$AGENTS/$label.plist"
-  launchctl bootout "$DOMAIN/$label" 2>/dev/null || true
   launchctl bootstrap "$DOMAIN" "$AGENTS/$label.plist"
 }
-reload_agent com.onetruck.hangil-api
-# A Caddy started by hand (outside launchd) would keep the port, so stop whatever owns the admin API first.
-launchctl bootout "$DOMAIN/com.onetruck.hangil-caddy" 2>/dev/null || true
-caddy stop >/dev/null 2>&1 || true
-reload_agent com.onetruck.hangil-caddy
+
+stop_agent com.onetruck.hangil-api
+start_agent com.onetruck.hangil-api
+
+stop_agent com.onetruck.hangil-caddy
+caddy stop >/dev/null 2>&1 || true # a Caddy started by hand (outside launchd) would keep the port
+start_agent com.onetruck.hangil-caddy
 
 for _ in $(seq 30); do
   if curl -fsS http://127.0.0.1:4173/api/v1/health; then
