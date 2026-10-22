@@ -1,0 +1,31 @@
+# One origin for the demo: the web client (oneload-app build) and this API behind it.
+# Tailscale Funnel exposes 127.0.0.1:4173 as https://baki-macbookpro.tail3286a4.ts.net:10000/.
+# Installed to ~/hangil-demo/Caddyfile by deploy.sh; edit here, not on the server.
+{
+	admin localhost:2019
+	auto_https off
+}
+
+:4173 {
+	bind 127.0.0.1
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle {
+		root * {$HOME}/hangil-demo/dist
+
+		# Vite fingerprints everything under /assets, so it can be cached forever.
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		@panos path /panos/*
+		header @panos Cache-Control "public, max-age=86400"
+		@html path / /index.html
+		header @html Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
+	}
+}

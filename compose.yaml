@@ -1,0 +1,22 @@
+services:
+  db:
+    # pgvector is bundled so the RAG module can add vector columns without changing the image.
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: hangil
+      POSTGRES_PASSWORD: hangil
+      POSTGRES_DB: hangil
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/create-test-db.sql:/docker-entrypoint-initdb.d/create-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hangil"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

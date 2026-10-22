@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- __HOME__ is replaced by deploy.sh. Keeps the demo's web + API proxy up across reboots. -->
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.onetruck.hangil-caddy</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/opt/homebrew/bin/caddy</string>
+      <string>run</string>
+      <string>--config</string>
+      <string>__HOME__/hangil-demo/Caddyfile</string>
+      <string>--adapter</string>
+      <string>caddyfile</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>HOME</key>
+      <string>__HOME__</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/hangil-caddy.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/hangil-caddy.log</string>
+  </dict>
+</plist>

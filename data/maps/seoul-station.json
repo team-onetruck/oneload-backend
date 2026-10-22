@@ -1,0 +1,64 @@
+{
+  "map_id": "seoul-station",
+  "version": "2026-10-22.1",
+  "name": { "en": "Seoul Station · Airport Railroad", "ko": "서울역 · 공항철도" },
+  "provenance": {
+    "confirmed": "Floors of AREX ticket points (express B2, all-stop B3) and platforms (B7), from the AREX official guide checked 2026-10-22: https://www.airportrailroad.com/co/steUsfGud.do",
+    "placeholder": "Node positions, elevations, passages, distances, headings, sign texts and panoramas until the field survey. Panoramas are CC0 photos of other stations (Poly Haven)."
+  },
+  "coordinate_system": {
+    "frame": "map", "unit": "m", "handedness": "left",
+    "x_axis": "east", "y_axis": "up", "z_axis": "north",
+    "heading_zero": "+z", "heading_positive": "clockwise_from_above"
+  },
+  "floors": [
+    { "floor_id": "2F", "elevation_m": 10 },
+    { "floor_id": "B1", "elevation_m": -6 },
+    { "floor_id": "B2", "elevation_m": -12 },
+    { "floor_id": "B3", "elevation_m": -18 },
+    { "floor_id": "B7", "elevation_m": -40 }
+  ],
+  "nodes": [
+    { "id": "ktx-hall", "floor_id": "2F", "position": { "x": 0, "y": 10, "z": 120 }, "name": { "en": "KTX hall (Seoul Station)", "ko": "서울역 KTX 맞이방" } },
+    { "id": "line1-gates", "floor_id": "B1", "position": { "x": -60, "y": -6, "z": 40 }, "name": { "en": "Line 1 Seoul Station gates", "ko": "1호선 서울역 개찰구" } },
+    { "id": "line4-gates", "floor_id": "B1", "position": { "x": 60, "y": -6, "z": 30 }, "name": { "en": "Line 4 Seoul Station gates", "ko": "4호선 서울역 개찰구" } },
+    { "id": "arex-concourse", "floor_id": "B2", "position": { "x": 0, "y": -12, "z": 0 }, "name": { "en": "AREX Seoul Station concourse", "ko": "공항철도 서울역 대합실" } },
+    { "id": "express-tickets", "floor_id": "B2", "position": { "x": 30, "y": -12, "z": 0 }, "name": { "en": "Express ticket counter", "ko": "직통열차 표 사는 곳" } },
+    { "id": "express-gates", "floor_id": "B2", "position": { "x": 55, "y": -12, "z": 0 }, "name": { "en": "Express train gates", "ko": "직통열차 개찰구" } },
+    { "id": "allstop-tickets", "floor_id": "B3", "position": { "x": -30, "y": -18, "z": 0 }, "name": { "en": "All-stop ticket machines", "ko": "일반열차 표 사는 곳" } },
+    { "id": "allstop-gates", "floor_id": "B3", "position": { "x": -45, "y": -18, "z": 0 }, "name": { "en": "All-stop train gates", "ko": "일반열차 개찰구" } },
+    { "id": "express-platform", "floor_id": "B7", "position": { "x": 55, "y": -40, "z": -60 }, "name": { "en": "Express train platform", "ko": "직통열차 승강장" } },
+    { "id": "allstop-platform", "floor_id": "B7", "position": { "x": -45, "y": -40, "z": -60 }, "name": { "en": "All-stop train platform", "ko": "일반열차 승강장" } }
+  ],
+  "edges": [
+    { "from": "ktx-hall", "to": "arex-concourse", "type": "escalator", "distance_m": 120, "heading_deg": 180, "instruction": { "en": "Follow the blue “Airport Railroad” signs and take the escalators down to B2.", "ko": "파란색 “공항철도” 표지를 따라 에스컬레이터로 B2까지 내려가세요." } },
+    { "from": "line1-gates", "to": "arex-concourse", "type": "escalator", "distance_m": 90, "heading_deg": 120, "instruction": { "en": "Follow the “Airport Railroad” transfer signs, then go down to B2.", "ko": "“공항철도” 환승 표지를 따라 B2로 내려가세요." } },
+    { "from": "line4-gates", "to": "arex-concourse", "type": "escalator", "distance_m": 110, "heading_deg": 240, "instruction": { "en": "Follow the “Airport Railroad” transfer signs, then go down to B2.", "ko": "“공항철도” 환승 표지를 따라 B2로 내려가세요." } },
+    { "from": "arex-concourse", "to": "express-tickets", "type": "corridor", "distance_m": 30, "heading_deg": 90, "instruction": { "en": "Look for the “Express Train” ticket counter on this floor.", "ko": "이 층에서 “직통열차” 표 사는 곳을 찾으세요." } },
+    { "from": "arex-concourse", "to": "allstop-tickets", "type": "escalator", "distance_m": 40, "heading_deg": 270, "instruction": { "en": "Go down one more floor to B3 for all-stop tickets.", "ko": "일반열차 표는 한 층 더 내려가 B3에서 사요." } },
+    { "from": "express-tickets", "to": "express-gates", "type": "gate", "distance_m": 25, "heading_deg": 90, "instruction": { "en": "Go through the express train gates with your ticket.", "ko": "승차권으로 직통열차 개찰구를 통과하세요." } },
+    { "from": "allstop-tickets", "to": "allstop-gates", "type": "gate", "distance_m": 15, "heading_deg": 270, "instruction": { "en": "Tap your card at the all-stop train gates.", "ko": "일반열차 개찰구에 교통카드를 찍으세요." } },
+    { "from": "express-gates", "to": "express-platform", "type": "escalator", "distance_m": 60, "heading_deg": 180, "instruction": { "en": "Take the long escalators down to the platform on B7.", "ko": "긴 에스컬레이터를 타고 B7 승강장으로 내려가세요." } },
+    { "from": "allstop-gates", "to": "allstop-platform", "type": "escalator", "distance_m": 60, "heading_deg": 180, "instruction": { "en": "Take the long escalators down to the platform on B7.", "ko": "긴 에스컬레이터를 타고 B7 승강장으로 내려가세요." } }
+  ],
+  "pois": [
+    { "poi_id": "poi-express-tickets", "node_id": "express-tickets", "category": "tickets", "train_type": "express", "name": { "en": "Express ticket counter", "ko": "직통열차 표 사는 곳" }, "aliases": ["express ticket", "AREX express", "직통열차 표", "공항 직통"], "verified": true },
+    { "poi_id": "poi-allstop-tickets", "node_id": "allstop-tickets", "category": "tickets", "train_type": "allstop", "name": { "en": "All-stop ticket machines", "ko": "일반열차 표 사는 곳" }, "aliases": ["single journey ticket", "transit card machine", "일반열차 표", "1회용 교통카드"], "verified": true },
+    { "poi_id": "poi-express-platform", "node_id": "express-platform", "category": "platform", "train_type": "express", "name": { "en": "Express train platform", "ko": "직통열차 승강장" }, "aliases": ["express platform", "직통 승강장"], "verified": true },
+    { "poi_id": "poi-allstop-platform", "node_id": "allstop-platform", "category": "platform", "train_type": "allstop", "name": { "en": "All-stop train platform", "ko": "일반열차 승강장" }, "aliases": ["all-stop platform", "일반 승강장"], "verified": true }
+  ],
+  "landmarks": [
+    { "landmark_id": "lm-ktx-hall", "node_id": "ktx-hall", "sign_texts": ["KTX", "맞이방", "Departure Hall"] },
+    { "landmark_id": "lm-line1-transfer", "node_id": "line1-gates", "sign_texts": ["공항철도", "Airport Railroad", "1호선", "Line 1"] },
+    { "landmark_id": "lm-line4-transfer", "node_id": "line4-gates", "sign_texts": ["공항철도", "Airport Railroad", "4호선", "Line 4"] },
+    { "landmark_id": "lm-arex-concourse", "node_id": "arex-concourse", "sign_texts": ["직통열차", "Express Train", "일반열차", "All Stop Train"] }
+  ],
+  "panoramas": [
+    { "pano_id": "pano-ktx-hall", "node_id": "ktx-hall", "image_url": "/panos/hamburg_hbf.webp", "north_yaw_deg": 80, "captured_at": null, "is_example": true },
+    { "pano_id": "pano-line1-gates", "node_id": "line1-gates", "image_url": "/panos/subway_entrance.webp", "north_yaw_deg": -200, "captured_at": null, "is_example": true },
+    { "pano_id": "pano-line4-gates", "node_id": "line4-gates", "image_url": "/panos/subway_entrance.webp", "north_yaw_deg": -320, "captured_at": null, "is_example": true },
+    { "pano_id": "pano-arex-concourse", "node_id": "arex-concourse", "image_url": "/panos/metro_noord.webp", "north_yaw_deg": 162, "captured_at": null, "is_example": true },
+    { "pano_id": "pano-express-gates", "node_id": "express-gates", "image_url": "/panos/metro_vijzelgracht.webp", "north_yaw_deg": -156, "captured_at": null, "is_example": true },
+    { "pano_id": "pano-allstop-gates", "node_id": "allstop-gates", "image_url": "/panos/metro_vijzelgracht.webp", "north_yaw_deg": -156, "captured_at": null, "is_example": true }
+  ]
+}
