@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from app.ai.contracts import AgentResponse, AgentResult, Destination, Slots
 from app.domain.mapdata import MapStore
 from app.main import create_app
 from tests.conftest import Api, FakeVision, error_code
@@ -131,3 +132,34 @@ def test_the_agents_card_answer_fills_in_the_ticket_type(api: Api):
     facts = api.http.get(api.url("/plan"), headers=api.headers()).json()["facts"]
 
     assert facts["ticket_type"] == "NONE"
+
+
+class _SaysSingleUseNotRefunded:
+    """An agent that heard "I have a single-use card and haven't refunded it, take me to exit 3"."""
+
+    def handle_message(self, ctx, message, image, selected_poi_id) -> AgentResult:
+        response = AgentResponse(
+            status="destination_set",
+            intent="navigate_to_exit",
+            assistant_message="3번 출구로 안내할게요.",
+            slots=Slots(has_single_use_card="yes", single_use_card_returned="no"),
+            destination=Destination(poi_id="poi-exit3"),
+            next_action="locate",
+        )
+        return AgentResult(response, frozenset())
+
+
+def test_ticket_facts_told_to_the_agent_reach_the_plan_without_overriding_the_client(mock_station):
+    store = MapStore([mock_station])
+    with TestClient(create_app(map_store=store, agent=_SaysSingleUseNotRefunded(), vision=FakeVision())) as http:
+        heard = Api(http=http, vision=FakeVision(), map_id=mock_station.map_id)
+        heard.start()
+        told_by_agent = heard.say("1회용 카드 있고 환급 안 했어요. 3번 출구")
+
+        client_set = Api(http=http, vision=FakeVision(), map_id=mock_station.map_id)
+        client_set.start()
+        _patch(client_set, ticket_type="TRANSIT_CARD")
+        kept = client_set.say("1회용 카드 있고 환급 안 했어요. 3번 출구")
+
+    assert [s["type"] for s in told_by_agent["plan"]["steps"]] == ["REFUND_SINGLE_USE_CARD", "MOVE_TO_DESTINATION"]
+    assert [s["type"] for s in kept["plan"]["steps"]] == ["MOVE_TO_DESTINATION"]

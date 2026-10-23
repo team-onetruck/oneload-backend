@@ -39,7 +39,7 @@ def test_r2_agent_runs_through_backend_message_api(map_store):
         description = http.get("/api/v1/openapi.json").json()["info"]["description"]
 
     assert response["status"] == "needs_clarification"
-    assert response["intent"] == "ticket_purchase_and_navigation"
+    assert response["intent"] == "purchase_arex_ticket"
     assert [item["label"] for item in response["suggested_replies"]] == ["직통열차", "일반열차", "잘 모르겠어요"]
     assert "대화: `LLMAgent`" in description
     assert "사진: `LLMVision`" in description

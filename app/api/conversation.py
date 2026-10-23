@@ -20,7 +20,7 @@ from app.api.deps import (
     status_of,
 )
 from app.config import get_settings
-from app.domain.planning import TicketType
+from app.domain.planning import RefundStatus, TicketType
 from app.domain.session_state import Trigger
 from app.errors import ApiError, ErrorCode
 from app.models import MessageRow, SessionRow
@@ -117,14 +117,14 @@ def send_message(
     response = guard(agent.handle_message(ctx, body.message, image, body.selected_poi_id), map_, row.language)
 
     row.slots = response.slots.model_dump()
-    learned_ticket = _ticket_from_card_answer(row, response.slots.has_transit_card)
+    learned = _learn_facts(row, response.slots)
     if response.status == "relocalize":
         row.confirmed_node_id = None
         row.location_method = None
     if response.destination:
         row.destination_poi_id = response.destination.poi_id
         row.active_route_id = None
-    plan = replan(row, map_) if response.destination or learned_ticket else plan_of(row)
+    plan = replan(row, map_) if response.destination or learned else plan_of(row)
     advance(row, _TRIGGER[response.status], has_location=row.confirmed_node_id is not None)
 
     message_id = new_id("msg")
@@ -203,10 +203,21 @@ def _recent_messages(db: Db, row: SessionRow) -> list[tuple[str, str]]:
     return [(m.role, m.content) for m in reversed(rows)]
 
 
-def _ticket_from_card_answer(row: SessionRow, has_transit_card: str) -> bool:
-    """The agent's yes/no about a transit card settles an unknown ticket type. Returns True if it did."""
-    learned = {"yes": TicketType.TRANSIT_CARD, "no": TicketType.NONE}.get(has_transit_card)
-    if learned is None or row.ticket_type != TicketType.UNKNOWN:
-        return False
-    row.ticket_type = learned
-    return True
+def _learn_facts(row: SessionRow, slots: Slots) -> bool:
+    """What the user told the agent about their ticket fills facts the planner did not know yet.
+
+    Facts the client already set (PATCH /sessions) are never overwritten. Returns True if any changed.
+    """
+    changed = False
+    if row.ticket_type == TicketType.UNKNOWN:
+        if slots.has_single_use_card == "yes":
+            ticket = TicketType.SINGLE_USE
+        else:
+            ticket = {"yes": TicketType.TRANSIT_CARD, "no": TicketType.NONE}.get(slots.has_transit_card)
+        if ticket:
+            row.ticket_type, changed = ticket, True
+    if row.refund_status == RefundStatus.UNKNOWN:
+        refund = {"yes": RefundStatus.REFUNDED, "no": RefundStatus.NOT_REFUNDED}.get(slots.single_use_card_returned)
+        if refund:
+            row.refund_status, changed = refund, True
+    return changed

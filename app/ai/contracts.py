@@ -15,6 +15,10 @@ from app.domain.mapdata import Lang, MapData
 
 Intent = Literal[
     "navigate_to_poi",
+    # Exit and AREX guidance flows (oneload_agent eca420e).
+    "navigate_to_exit",
+    "purchase_arex_ticket",
+    "board_arex",
     "ticket_purchase_and_navigation",
     "payment_question",
     "usage_question",
@@ -32,6 +36,10 @@ CardSlot = Literal["yes", "no", "unknown"]
 class Slots(BaseModel):
     train_type: TrainSlot = "unknown"
     has_transit_card: CardSlot = "unknown"
+    exit_number: str | None = None
+    has_single_use_card: CardSlot = "unknown"
+    single_use_card_returned: CardSlot = "unknown"  # deposit already refunded
+    has_ticket: CardSlot = "unknown"
 
 
 class Source(BaseModel):
