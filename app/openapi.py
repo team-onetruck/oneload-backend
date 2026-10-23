@@ -35,8 +35,9 @@ DESCRIPTION = """
    `{"language": "ko", "map_id": "seoul-station", "client": {"platform": "web", "app_version": "swagger"}}`
 2. 오른쪽 **Authorize**를 누르고 응답의 `session_token`을 붙여넣습니다.
 3. 모든 `POST`에는 `Idempotency-Key` 헤더가 필요합니다. 요청마다 새 UUID를 넣으세요.
-   같은 값을 다시 쓰면 첫 응답이 그대로 돌아옵니다.
-4. 대표 흐름: `messages`("돈은 어떻게 내요?", "직통열차") → `location-confirmations`
+   같은 값을 다시 쓰면 첫 응답이 그대로 돌아오고, 첫 요청이 아직 처리 중이면 `409 REQUEST_IN_PROGRESS`가 옵니다.
+5. 앱을 다시 열면 `GET messages`(대화 기록)와 `navigation-state`(길안내 상태)로 화면을 복구합니다.
+6. 대표 흐름: `messages`("돈은 어떻게 내요?", "직통열차") → `location-confirmations`
    (`method`: `manual`, `selected_node_id`: `line4-gates`) → `routes` → `navigation-events`.
    상태를 바꾸는 요청에는 직전 응답의 `session.revision`을 `expected_revision`으로 넣습니다.
 
@@ -54,7 +55,10 @@ _IDEMPOTENCY_HEADER = {
     "name": "Idempotency-Key",
     "in": "header",
     "required": True,
-    "description": "요청마다 새 UUID. 같은 키와 같은 본문으로 다시 보내면 저장된 응답을 돌려줍니다.",
+    "description": (
+        "요청마다 새 UUID. 같은 키와 같은 본문으로 다시 보내면 저장된 응답을 돌려주고,"
+        " 첫 요청이 아직 처리 중이면 409 REQUEST_IN_PROGRESS(Retry-After: 1)를 돌려줍니다."
+    ),
     "schema": {"type": "string", "maxLength": 64},
 }
 

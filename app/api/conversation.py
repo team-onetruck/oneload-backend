@@ -1,11 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import ValidationError
 from sqlalchemy import select
 from starlette.datastructures import UploadFile
 
-from app.ai.contracts import AgentContext, Slots
+from app.ai.contracts import AgentContext, AgentResponse, Slots
 from app.ai.guard import guard
 from app.api.deps import AgentDep, CurrentSession, Db, Maps, advance, map_of, read_jpeg, status_of
 from app.config import get_settings
@@ -13,7 +13,7 @@ from app.domain.session_state import Trigger
 from app.errors import ApiError, ErrorCode
 from app.models import MessageRow, SessionRow
 from app.openapi import Tag
-from app.schemas import MessageIn, MessageOut
+from app.schemas import ChatMessage, MessageIn, MessageOut, MessagesOut
 from app.security import new_id
 
 router = APIRouter(tags=[Tag.CONVERSATION])
@@ -116,12 +116,66 @@ def send_message(
     db.add_all(
         [
             MessageRow(
-                id=new_id("msg"), session_id=row.id, role="user", content=body.message or f"[{body.selected_poi_id}]"
+                id=new_id("msg"),
+                session_id=row.id,
+                role="user",
+                content=body.message or f"[{body.selected_poi_id}]",
+                payload={
+                    "message": body.message,
+                    "selected_poi_id": body.selected_poi_id,
+                    "has_image": image is not None,
+                },
             ),
-            MessageRow(id=message_id, session_id=row.id, role="assistant", content=response.assistant_message),
+            MessageRow(
+                id=message_id,
+                session_id=row.id,
+                role="assistant",
+                content=response.assistant_message,
+                payload=response.model_dump(mode="json"),
+            ),
         ]
     )
     return MessageOut(**response.model_dump(), message_id=message_id, session=status_of(row))
+
+
+@router.get(
+    "/sessions/{session_id}/messages",
+    summary="대화 기록 조회",
+    description=(
+        "앱을 다시 열거나 연결이 끊겼다 돌아왔을 때 화면을 복구합니다. 최근 메시지를 오래된 순서로 돌려주며,"
+        " 한길의 답변은 보냈을 때와 같은 모양(`reply`: 목록·tip·확인되지 않음·출처·추천 답변)으로 들어 있습니다."
+        " 길안내 진행 상태는 `navigation-state`로 함께 복구하세요."
+    ),
+)
+def list_messages(
+    row: CurrentSession,
+    db: Db,
+    limit: Annotated[int, Query(ge=1, le=100, description="최근 몇 개를 받을지")] = 50,
+) -> MessagesOut:
+    rows = db.scalars(
+        select(MessageRow).where(MessageRow.session_id == row.id).order_by(MessageRow.seq.desc()).limit(limit)
+    ).all()
+    return MessagesOut(messages=[_history_item(m) for m in reversed(rows)], session=status_of(row))
+
+
+def _history_item(m: MessageRow) -> ChatMessage:
+    payload = m.payload or {}
+    if m.role == "assistant":
+        return ChatMessage(
+            message_id=m.id,
+            role="assistant",
+            created_at=m.created_at,
+            text=m.content,
+            reply=AgentResponse.model_validate(payload) if payload else None,
+        )
+    return ChatMessage(
+        message_id=m.id,
+        role="user",
+        created_at=m.created_at,
+        text=payload.get("message", m.content),
+        selected_poi_id=payload.get("selected_poi_id"),
+        has_image=payload.get("has_image", False),
+    )
 
 
 def _recent_messages(db: Db, row: SessionRow) -> list[tuple[str, str]]:

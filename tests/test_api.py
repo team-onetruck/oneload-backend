@@ -4,7 +4,8 @@ from sqlalchemy import update
 
 from app.db import SessionLocal
 from app.domain.localization import VisionFeatures, VisionText
-from app.models import SessionRow
+from app.models import IdempotencyRow, SessionRow
+from app.security import sha256_hex
 from tests.conftest import JPEG, Api, error_code
 
 
@@ -158,6 +159,73 @@ def test_idempotency_key_replays_and_rejects_reuse(api: Api):
     assert replay.json() == first.json()
     assert error_code(reused) == "IDEMPOTENCY_KEY_REUSED"
     assert (missing.status_code, error_code(missing)) == (400, "BAD_REQUEST")
+
+
+def _claim_key(api: Api, key: str, body: bytes, claimed_seconds_ago: int = 0) -> None:
+    """Put the database in the state of a request with this key that is still running."""
+    fingerprint = sha256_hex(f"{api.url('/messages')}\nBearer {api.token}\n".encode() + body)
+    with SessionLocal.begin() as db:
+        db.add(
+            IdempotencyRow(
+                key=key, fingerprint=fingerprint, created_at=datetime.now(UTC) - timedelta(seconds=claimed_seconds_ago)
+            )
+        )
+
+
+def test_a_retry_while_the_first_request_runs_is_not_run_twice(api: Api):
+    api.start()
+    body = b'{"message": "Express"}'
+    headers = {**api.headers(key="key-1"), "Content-Type": "application/json"}
+    _claim_key(api, "key-1", body)
+
+    busy = api.http.post(api.url("/messages"), content=body, headers=headers)
+    other_body = api.http.post(api.url("/messages"), content=b'{"message": "All-stop"}', headers=headers)
+    history = api.http.get(api.url("/messages"), headers=api.headers()).json()
+
+    assert (busy.status_code, error_code(busy), busy.headers["Retry-After"]) == (409, "REQUEST_IN_PROGRESS", "1")
+    assert busy.json()["error"]["retryable"] is True
+    assert error_code(other_body) == "IDEMPOTENCY_KEY_REUSED"
+    assert history["messages"] == []  # neither copy ran
+
+
+def test_a_claim_left_by_a_crashed_request_expires(api: Api):
+    api.start()
+    body = b'{"message": "Express"}'
+    _claim_key(api, "key-1", body, claimed_seconds_ago=120)
+
+    retried = api.http.post(
+        api.url("/messages"), content=body, headers={**api.headers(key="key-1"), "Content-Type": "application/json"}
+    )
+
+    assert retried.status_code == 200
+
+
+def test_a_failed_request_releases_its_key(api: Api):
+    api.start()
+    api.say("Express")
+    stale = {"expected_revision": 1, "method": "manual", "selected_node_id": "ktx-hall"}
+
+    first = api.raw_post("/location-confirmations", stale, key="key-1")
+    retry = api.raw_post("/location-confirmations", stale, key="key-1")
+
+    assert error_code(first) == error_code(retry) == "REVISION_CONFLICT"  # re-run, not stuck "in progress"
+
+
+def test_history_restores_the_conversation_after_a_reconnect(api: Api):
+    api.start()
+    api.say("How do I pay?")
+    api.post("/messages", {"selected_poi_id": "poi-express-tickets"})
+
+    history = api.http.get(api.url("/messages"), headers=api.headers()).json()
+    last_two = api.http.get(api.url("/messages"), params={"limit": 2}, headers=api.headers()).json()
+
+    pay_q, pay_a, pick_q, pick_a = history["messages"]
+    assert (pay_q["role"], pay_q["text"]) == ("user", "How do I pay?")
+    assert pay_a["reply"]["items"] and pay_a["reply"]["unverified_notes"]  # same reply the client first saw
+    assert pick_q["selected_poi_id"] == "poi-express-tickets"
+    assert pick_a["reply"]["destination"] == {"poi_id": "poi-express-tickets"}
+    assert [m["message_id"] for m in last_two["messages"]] == [pick_q["message_id"], pick_a["message_id"]]
+    assert history["session"]["state"] == "needs_location"
 
 
 def test_session_token_rules(api: Api):

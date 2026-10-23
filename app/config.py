@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     session_idle_seconds: int = 2 * 60 * 60
     localization_ttl_seconds: int = 5 * 60
     idempotency_ttl_seconds: int = 24 * 60 * 60
+    # A claimed key whose request never finished (e.g. the process died) is freed after this long.
+    idempotency_claim_timeout_seconds: int = 60
     max_image_bytes: int = 2 * 1024 * 1024
     recent_messages: int = 10
 

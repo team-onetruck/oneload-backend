@@ -42,6 +42,9 @@ class MessageRow(Base):
     session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
     role: Mapped[str] = mapped_column(String(16))
     content: Mapped[str] = mapped_column(Text)
+    # What the client needs to redraw the turn after a reconnect: the full reply for the assistant,
+    # the chosen POI and whether a photo was attached for the user.
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -95,6 +98,7 @@ class IdempotencyRow(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     fingerprint: Mapped[str] = mapped_column(String(64))
-    status_code: Mapped[int] = mapped_column(Integer)
-    body: Mapped[bytes]
+    # NULL while the first request with this key is still running; set once it succeeded.
+    status_code: Mapped[int | None] = mapped_column(Integer)
+    body: Mapped[bytes | None]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

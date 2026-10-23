@@ -158,6 +158,21 @@ class MessageOut(AgentResponse):
     session: SessionStatus
 
 
+class ChatMessage(BaseModel):
+    message_id: str
+    role: Literal["user", "assistant"]
+    created_at: datetime
+    text: str
+    selected_poi_id: str | None = Field(default=None, description="사용자가 버튼·목록으로 고른 목적지 (user)")
+    has_image: bool = Field(default=False, description="사진을 붙여 보냈는지 (user). 사진 자체는 저장하지 않습니다")
+    reply: AgentResponse | None = Field(default=None, description="보냈을 때와 같은 답변 전체 (assistant)")
+
+
+class MessagesOut(BaseModel):
+    messages: list[ChatMessage]
+    session: SessionStatus
+
+
 # --- location ---------------------------------------------------------------------------------
 
 
