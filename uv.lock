@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 
 [[package]]
@@ -796,14 +796,14 @@ wheels = [
 [[package]]
 name = "oneload-agent"
 version = "0.1.0"
-source = { url = "https://github.com/team-onetruck/oneload_agent/archive/54c321f7d86f55f5d3178744088b2c3827d73914.tar.gz" }
+source = { url = "https://github.com/team-onetruck/oneload_agent/archive/7f116deac946479cdacaa5d9ade87d5e9829d051.tar.gz" }
 dependencies = [
     { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "pydantic" },
     { name = "python-dotenv" },
 ]
-sdist = { hash = "sha256:31bd13f6210b33243cbf0343387394ceb50e9d304f311301d1501f8b78f6c7bd" }
+sdist = { hash = "sha256:c6f9454d824c3bf0c160d3b2ec91d748eb58cf7c62237aaf81f2c253c89cf2e0" }
 
 [package.metadata]
 requires-dist = [
@@ -841,7 +841,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.20.1" },
     { name = "fastapi", specifier = ">=0.159.1" },
     { name = "networkx", specifier = ">=3.7" },
-    { name = "oneload-agent", url = "https://github.com/team-onetruck/oneload_agent/archive/54c321f7d86f55f5d3178744088b2c3827d73914.tar.gz" },
+    { name = "oneload-agent", url = "https://github.com/team-onetruck/oneload_agent/archive/7f116deac946479cdacaa5d9ade87d5e9829d051.tar.gz" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
     { name = "pydantic-settings", specifier = ">=2.16.1" },
     { name = "python-multipart", specifier = ">=0.0.32" },

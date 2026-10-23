@@ -33,4 +33,4 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 testpaths = ["tests"]
 
 [tool.uv.sources]
-oneload-agent = { url = "https://github.com/team-onetruck/oneload_agent/archive/54c321f7d86f55f5d3178744088b2c3827d73914.tar.gz" }
+oneload-agent = { url = "https://github.com/team-onetruck/oneload_agent/archive/7f116deac946479cdacaa5d9ade87d5e9829d051.tar.gz" }
