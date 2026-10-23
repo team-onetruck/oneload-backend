@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Redeploy without a backend change. oneload-app's CI starts this after its main passes (oneload_agent
-  # goes through agent-bump.yml); after changing a secret, oneload-data or oneload-infra: gh workflow run ci.yml
+  # Redeploy by hand after changing a secret, oneload-data or oneload-infra: gh workflow run ci.yml
   workflow_dispatch:
 
 jobs:
@@ -26,6 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+      # Deploys run oneload_agent main, not the pin in pyproject.toml, so test against that.
+      - name: Use oneload_agent main
+        run: |
+          sha=$(git ls-remote https://github.com/team-onetruck/oneload_agent refs/heads/main | cut -f1)
+          uv add --no-sync "oneload-agent @ https://github.com/team-onetruck/oneload_agent/archive/$sha.tar.gz"
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -50,30 +54,7 @@ jobs:
   deploy:
     needs: [test, image]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    # Self-hosted runner on macserver (label "hangil"). This repo is public: fork PR workflows wait for
-    # a maintainer's approval (all outside contributors), so never approve one that touches .github/.
-    runs-on: [self-hosted, macOS, hangil]
-    concurrency:
-      group: deploy-macserver
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: backend
-      - uses: actions/checkout@v4
-        with:
-          repository: team-onetruck/oneload-infra
-          path: infra
-      - uses: actions/checkout@v4
-        with:
-          repository: team-onetruck/oneload-data
-          path: data
-      - uses: actions/checkout@v4
-        with:
-          repository: team-onetruck/oneload-app
-          path: web
-      - run: infra/macserver/deploy.sh backend data web
-        env:
-          # Server settings: one repository secret per line, exposed to deploy.sh with an APP_ prefix.
-          # Add a line here when the API needs a new setting; an unset secret is simply skipped.
-          APP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    # Runs on this repo's self-hosted runner on macserver. The repo is public: fork PR workflows wait
+    # for a maintainer's approval (all outside contributors), so never approve one that touches .github/.
+    uses: team-onetruck/oneload-infra/.github/workflows/deploy.yml@main
+    secrets: inherit # server settings come from this repo's secrets

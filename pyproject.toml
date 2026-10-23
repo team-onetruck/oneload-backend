@@ -32,5 +32,7 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+# Local development pin. CI and deploys replace it with oneload_agent main; refresh it with
+# uv add "oneload-agent @ https://github.com/team-onetruck/oneload_agent/archive/<commit>.tar.gz"
 [tool.uv.sources]
 oneload-agent = { url = "https://github.com/team-onetruck/oneload_agent/archive/7f116deac946479cdacaa5d9ade87d5e9829d051.tar.gz" }

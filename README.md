@@ -51,9 +51,9 @@ Settings come from environment variables or `.env` (see `app/config.py`): `DATAB
 
 ## CI and deploy
 
-`.github/workflows/ci.yml` runs lint and tests on every push, checks that the current oneload-data still loads with this code, and builds the `Dockerfile` to catch image breakage. On `main` the `deploy` job runs on the self-hosted runner on macserver, checks out this repo, oneload-infra, oneload-data and oneload-app, and runs `macserver/deploy.sh` from oneload-infra, which builds the API and web images on the server and runs them with Postgres as the compose project `hangil` (details and the Portainer dashboard in that repo).
+`.github/workflows/ci.yml` runs lint and tests on every push, checks that the current oneload-data still loads with this code, and builds the `Dockerfile` to catch image breakage. On `main` the `deploy` job calls oneload-infra's shared deploy workflow on this repo's self-hosted runner on macserver. It deploys `main` of every repo: it builds the API image (with oneload_agent `main`) and the web image (oneload-app) on the server and runs them with Postgres as the compose project `hangil` (details and the Portainer dashboard in oneload-infra). oneload-app and oneload_agent call the same deploy from their own CI and runners.
 
-The agent is pinned to one oneload_agent commit in `pyproject.toml`. When oneload_agent's `main` passes its CI (which also runs this repo's tests with the new agent), it starts `.github/workflows/agent-bump.yml`, which commits the new pin and starts CI / Deploy. Roll back the same way: `gh workflow run agent-bump.yml -f sha=<older commit>`. oneload-app's CI likewise starts CI / Deploy after its `main` passes.
+The oneload_agent pin in `pyproject.toml` is for local development only: CI and deploys replace it with oneload_agent `main`, so tests always run against the agent that will be deployed.
 
 Redeploy by hand (after editing data, infra or a secret):
 
@@ -63,11 +63,11 @@ gh workflow run ci.yml -R team-onetruck/oneload-backend
 
 ### Settings and secrets
 
-Server settings live only in **GitHub repository secrets** of this repo. The deploy step maps each one to an `APP_*` variable (`APP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}`), and the deploy script writes every non-empty one to `~/hangil-api.env` on macserver (mode 600, prefix removed, previous file replaced). Never edit that file by hand or commit a value.
+Server settings live only in **GitHub repository secrets** of this repo. When this repo deploys, the shared deploy workflow maps each one to an `APP_*` variable (`APP_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}`), and the deploy script writes every non-empty one to `~/hangil-api.env` on macserver (mode 600, prefix removed, previous file replaced). Deploys started by oneload-app or oneload_agent leave the file alone. Never edit that file by hand or commit a value.
 
 ```sh
 gh secret set OPENAI_API_KEY -R team-onetruck/oneload-backend   # prompts for the value
 gh workflow run ci.yml -R team-onetruck/oneload-backend          # redeploy so the API picks it up
 ```
 
-A new setting needs the secret plus one mapping line in the workflow. Deleting a secret and redeploying removes it from the server.
+A new setting needs the secret plus its mapping in oneload-infra's `.github/workflows/deploy.yml`. Deleting a secret and redeploying from this repo removes it from the server.
