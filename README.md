@@ -40,14 +40,14 @@ Settings come from environment variables or `.env` (see `app/config.py`): `DATAB
 
 ## AI modules: what is real today
 
-| Piece | Today | Next |
+| Piece | Production | Fallback / next |
 | --- | --- | --- |
-| Agent (`/messages`) | `RuleAgent`: keyword rules for the Seoul Station payment scenario, same contract and guard | OpenAI-backed agent (R2) implementing `Agent` |
-| Photo → text (`/localizations`) | `NoVision`: answers **503 `AI_SERVICE_UNAVAILABLE`**, so the client offers manual selection | OpenAI vision extractor implementing `VisionExtractor` |
-| Text → location | `match_location`: real, deterministic sign-text matcher | Unchanged |
-| Knowledge (RAG) | Fixed citations inside `RuleAgent` | R3 module on pgvector |
+| Agent (`/messages`) | R2 `LLMAgent` + `OpenAILLM` when `OPENAI_API_KEY` is set | Missing key: `RuleAgent` |
+| Photo → text (`/localizations`) | R2 `LLMVision` using the same OpenAI client | Missing key: `NoVision` → 503 and manual selection |
+| Text → location | Deterministic `match_location` | Unchanged |
+| Knowledge (RAG) | Packaged `MockKnowledgeSearch` demo documents | Replace with the R3 pgvector service |
 
-Swapping one in is a change to `create_app()` defaults in `app/main.py`; no endpoint changes.
+`app/main.py` selects the OpenAI components at process startup. The API endpoints and response schemas do not change.
 
 ## CI and deploy
 

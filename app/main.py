@@ -1,7 +1,9 @@
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from hangil_r2 import LLMAgent, LLMVision, MockKnowledgeSearch, OpenAILLM
 
 from app.ai.contracts import Agent, VisionExtractor
 from app.ai.rule_agent import RuleAgent
@@ -14,6 +16,18 @@ from app.middleware import IdempotencyMiddleware, RequestContextMiddleware
 from app.openapi import install_openapi
 
 API_PREFIX = "/api/v1"
+
+
+def production_ai() -> tuple[Agent, VisionExtractor]:
+    """Use R2/OpenAI in deployment; retain deterministic stand-ins when no server secret exists."""
+    if not os.getenv("OPENAI_API_KEY", "").strip():
+        logging.getLogger("hangil.ai").warning("OPENAI_API_KEY is missing; using RuleAgent and NoVision")
+        return RuleAgent(), NoVision()
+
+    llm = OpenAILLM()
+    vision = LLMVision(llm)
+    agent = LLMAgent(llm, search_knowledge=MockKnowledgeSearch(), vision=vision, fallback=RuleAgent())
+    return agent, vision
 
 
 def create_app(
@@ -53,4 +67,5 @@ def create_app(
     return app
 
 
-app = create_app()
+production_agent, production_vision = production_ai()
+app = create_app(agent=production_agent, vision=production_vision)

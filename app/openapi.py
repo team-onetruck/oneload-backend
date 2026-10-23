@@ -29,27 +29,39 @@ DESCRIPTION = """
 서울역 공항철도(AREX) 길안내 API입니다. API 명세 v0.3에 시스템 설계서 v0.2의 변경(거리뷰, 사진 첨부 대화,
 `tip`·`unverified_notes`)을 반영했습니다.
 
-**여기서 직접 호출해보기**
+**Swagger에서 대화 테스트**
 
-1. `POST /sessions`에 아래 본문을 보냅니다.
+1. `POST /sessions`에 아래 본문을 넣고 **Execute**를 누릅니다.
    `{"language": "ko", "map_id": "seoul-station", "client": {"platform": "web", "app_version": "swagger"}}`
-2. 오른쪽 **Authorize**를 누르고 응답의 `session_token`을 붙여넣습니다.
-3. 모든 `POST`에는 `Idempotency-Key` 헤더가 필요합니다. 요청마다 새 UUID를 넣으세요.
-   같은 값을 다시 쓰면 첫 응답이 그대로 돌아오고, 첫 요청이 아직 처리 중이면 `409 REQUEST_IN_PROGRESS`가 옵니다.
-5. 앱을 다시 열면 `GET messages`(대화 기록)와 `navigation-state`(길안내 상태)로 화면을 복구합니다.
-6. 대표 흐름: `messages`("돈은 어떻게 내요?", "직통열차") → `location-confirmations`
-   (`method`: `manual`, `selected_node_id`: `line4-gates`) → `routes` → `navigation-events`.
-   상태를 바꾸는 요청에는 직전 응답의 `session.revision`을 `expected_revision`으로 넣습니다.
+2. 응답의 `session_token`을 복사해 오른쪽 위 **Authorize**에 붙여넣습니다.
+3. `POST /sessions/{session_id}/messages`를 열고 `session_id`, 새 `Idempotency-Key` UUID,
+   본문 `{"message": "공항티켓 어디서 구매해?"}`를 넣어 **Execute**를 누릅니다.
+4. 응답의 `assistant_message`, `suggested_replies`, `destination`, `sources`를 확인합니다.
+
+모든 `POST`에는 요청마다 새 `Idempotency-Key`가 필요합니다. 같은 키와 같은 본문을 다시 보내면 저장된 응답을
+돌려주고, 첫 요청이 처리 중이면 `409 REQUEST_IN_PROGRESS`가 옵니다.
+
+대표 길안내 흐름은 `messages` → `location-confirmations` → `routes` → `navigation-events`입니다.
+상태를 바꾸는 요청에는 직전 응답의 `session.revision`을 `expected_revision`으로 넣습니다.
 
 **현재 제한**
 
-- 사진 인식은 아직 OpenAI에 연결되지 않아 `localizations`가 `503 AI_SERVICE_UNAVAILABLE`을 돌려줍니다.
-  위치는 `manual` 방식으로 확정하세요.
-- 대화 응답은 규칙 기반 임시 구현(`RuleAgent`)입니다.
+- 지식 검색은 아직 R3 서비스가 아니라 패키지에 포함된 데모 문서를 사용합니다.
 - 지도 데이터는 공항철도 층 정보(직통 표 B2, 일반 표 B3, 승강장 B7)만 확인된 값이고, 나머지는 현장 답사 전 임시값입니다.
 
 **오류 형식**: 모든 오류는 `{"error": {"code", "message", "retryable", "details"}, "request_id"}` 모양입니다.
 """
+
+
+def _description(app: FastAPI) -> str:
+    agent = type(app.state.agent).__name__
+    vision = type(app.state.vision).__name__
+    return (
+        f"{DESCRIPTION}\n\n**현재 AI 구성**\n\n"
+        f"- 대화: `{agent}` (`LLMAgent`는 OpenAI, `RuleAgent`는 키 미설정 시 대체 구현)\n"
+        f"- 사진: `{vision}` (`LLMVision`은 OpenAI, `NoVision`은 503 후 수동 위치 선택)\n"
+    )
+
 
 _IDEMPOTENCY_HEADER = {
     "name": "Idempotency-Key",
@@ -71,7 +83,7 @@ def install_openapi(app: FastAPI) -> None:
             schema = get_openapi(
                 title=app.title,
                 version=app.version,
-                description=DESCRIPTION,
+                description=_description(app),
                 routes=app.routes,
                 tags=[{"name": tag, "description": text} for tag, text in _TAG_DESCRIPTIONS.items()],
             )
