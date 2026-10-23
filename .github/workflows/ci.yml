@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch: # redeploy after changing a secret, oneload-data or oneload-infra: gh workflow run ci.yml
+  # Redeploy without a backend change. oneload-app's CI starts this after its main passes (oneload_agent
+  # goes through agent-bump.yml); after changing a secret, oneload-data or oneload-infra: gh workflow run ci.yml
+  workflow_dispatch:
 
 jobs:
   test:
@@ -48,7 +50,8 @@ jobs:
   deploy:
     needs: [test, image]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    # Self-hosted runner on macserver, registered to this private repo only (label "hangil").
+    # Self-hosted runner on macserver (label "hangil"). This repo is public: fork PR workflows wait for
+    # a maintainer's approval (all outside contributors), so never approve one that touches .github/.
     runs-on: [self-hosted, macOS, hangil]
     concurrency:
       group: deploy-macserver
@@ -65,7 +68,11 @@ jobs:
         with:
           repository: team-onetruck/oneload-data
           path: data
-      - run: infra/macserver/deploy.sh backend data
+      - uses: actions/checkout@v4
+        with:
+          repository: team-onetruck/oneload-app
+          path: web
+      - run: infra/macserver/deploy.sh backend data web
         env:
           # Server settings: one repository secret per line, exposed to deploy.sh with an APP_ prefix.
           # Add a line here when the API needs a new setting; an unset secret is simply skipped.

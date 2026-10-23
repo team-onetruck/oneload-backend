@@ -51,9 +51,11 @@ Settings come from environment variables or `.env` (see `app/config.py`): `DATAB
 
 ## CI and deploy
 
-`.github/workflows/ci.yml` runs lint and tests on every push, checks that the current oneload-data still loads with this code, and builds the `Dockerfile` to catch image breakage. On `main` the `deploy` job runs on the self-hosted runner on macserver, checks out this repo, oneload-infra and oneload-data, and runs `macserver/deploy.sh` from oneload-infra, which builds the image on the server and runs it with Postgres and Caddy as the compose project `hangil` (details and the Portainer dashboard in that repo).
+`.github/workflows/ci.yml` runs lint and tests on every push, checks that the current oneload-data still loads with this code, and builds the `Dockerfile` to catch image breakage. On `main` the `deploy` job runs on the self-hosted runner on macserver, checks out this repo, oneload-infra, oneload-data and oneload-app, and runs `macserver/deploy.sh` from oneload-infra, which builds the API and web images on the server and runs them with Postgres as the compose project `hangil` (details and the Portainer dashboard in that repo).
 
-Redeploy without a code change (after editing data, infra or a secret):
+The agent is pinned to one oneload_agent commit in `pyproject.toml`. When oneload_agent's `main` passes its CI (which also runs this repo's tests with the new agent), it starts `.github/workflows/agent-bump.yml`, which commits the new pin and starts CI / Deploy. Roll back the same way: `gh workflow run agent-bump.yml -f sha=<older commit>`. oneload-app's CI likewise starts CI / Deploy after its `main` passes.
+
+Redeploy by hand (after editing data, infra or a secret):
 
 ```sh
 gh workflow run ci.yml -R team-onetruck/oneload-backend
