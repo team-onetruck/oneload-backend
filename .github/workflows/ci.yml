@@ -38,8 +38,15 @@ jobs:
           uv run python -c "from pathlib import Path; from app.domain.mapdata import MapStore; \
           print([m.map_id + '@' + m.version for m in MapStore.load(Path('oneload-data/maps')).all()])"
 
+  image:
+    # Catches a broken Dockerfile on every push; the deploy builds its own image on the server.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t hangil-api:ci .
+
   deploy:
-    needs: test
+    needs: [test, image]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     # Self-hosted runner on macserver, registered to this private repo only (label "hangil").
     runs-on: [self-hosted, macOS, hangil]

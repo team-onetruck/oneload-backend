@@ -36,6 +36,7 @@ Settings come from environment variables or `.env` (see `app/config.py`): `DATAB
 | `app/openapi.py` | Korean Swagger texts, tags and the documented `Idempotency-Key` header |
 | `app/models.py`, `migrations/` | Tables and Alembic migrations |
 | `tests/fixtures/maps/` | Frozen copy of the Seoul Station map, so survey updates never change test outcomes |
+| `Dockerfile` | API image: uv-installed dependencies, runs as a non-root user, health-checked on `/api/v1/health` |
 
 ## AI modules: what is real today
 
@@ -50,7 +51,7 @@ Swapping one in is a change to `create_app()` defaults in `app/main.py`; no endp
 
 ## CI and deploy
 
-`.github/workflows/ci.yml` runs lint and tests on every push, then checks that the current oneload-data still loads with this code. On `main` the `deploy` job runs on the self-hosted runner on macserver, checks out this repo, oneload-infra and oneload-data, and runs `macserver/deploy.sh` from oneload-infra (details in that repo).
+`.github/workflows/ci.yml` runs lint and tests on every push, checks that the current oneload-data still loads with this code, and builds the `Dockerfile` to catch image breakage. On `main` the `deploy` job runs on the self-hosted runner on macserver, checks out this repo, oneload-infra and oneload-data, and runs `macserver/deploy.sh` from oneload-infra, which builds the image on the server and runs it with Postgres and Caddy as the compose project `hangil` (details and the Portainer dashboard in that repo).
 
 Redeploy without a code change (after editing data, infra or a secret):
 
