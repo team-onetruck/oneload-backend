@@ -26,6 +26,9 @@ from app.main import create_app  # noqa: E402
 
 # A frozen copy of the Seoul Station map, so survey updates in oneload-data never change test outcomes.
 FIXTURE_MAPS = Path(__file__).parent / "fixtures" / "maps"
+# An invented station for the planner: paid and free areas, a closed refund machine, a decoy machine
+# away from the exit, stairs versus elevator and a stairs-only exit.
+MOCK_STATION = Path(__file__).parent / "fixtures" / "mock-station.json"
 
 
 def _ensure_test_database() -> None:
@@ -81,6 +84,7 @@ class Api:
 
     http: TestClient
     vision: FakeVision
+    map_id: str = "seoul-station"
     session_id: str = ""
     token: str = ""
     revision: int = 0
@@ -90,7 +94,7 @@ class Api:
     def start(self, language: str = "en") -> dict[str, Any]:
         body = self.post(
             "/sessions",
-            {"language": language, "map_id": "seoul-station", "client": {"platform": "web", "app_version": "test"}},
+            {"language": language, "map_id": self.map_id, "client": {"platform": "web", "app_version": "test"}},
             auth=False,
         )
         self.session_id, self.token, self.map_version = body["session_id"], body["session_token"], body["map_version"]
@@ -138,6 +142,19 @@ def api(map_store: MapStore) -> Iterator[Api]:
     vision = FakeVision()
     with TestClient(create_app(map_store=map_store, vision=vision)) as http:
         yield Api(http=http, vision=vision)
+
+
+@pytest.fixture(scope="session")
+def mock_station() -> MapData:
+    return MapData.model_validate_json(MOCK_STATION.read_text())
+
+
+@pytest.fixture
+def mock_api(mock_station: MapData) -> Iterator[Api]:
+    """An API on the invented test station (paid/free areas, refund machines, exits)."""
+    vision = FakeVision()
+    with TestClient(create_app(map_store=MapStore([mock_station]), vision=vision)) as http:
+        yield Api(http=http, vision=vision, map_id=mock_station.map_id)
 
 
 def error_code(response: Response) -> str:

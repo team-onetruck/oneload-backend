@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.ai.contracts import AgentResponse
 from app.domain.localization import Candidate
 from app.domain.mapdata import Edge, Floor, Landmark, Lang, Node, Panorama, Position, Text, TrainType
+from app.domain.planning import Facts, Plan, RefundStatus, TicketType
 
 # Optimistic locking (API spec v0.3 §3): the revision the client last saw; a mismatch answers 409 REVISION_CONFLICT.
 ExpectedRevision = Annotated[int, Field(description="직전 응답의 session.revision. 다르면 409 REVISION_CONFLICT")]
@@ -49,6 +50,7 @@ class CreateSessionOut(BaseModel):
 
 class Preferences(BaseModel):
     avoid_stairs: bool = Field(default=False, description="계단이 없는 경로만 사용")
+    wheelchair: bool = Field(default=False, description="휠체어로 갈 수 있는 경로만 사용 (계단·에스컬레이터 제외)")
 
 
 class PatchSessionIn(BaseModel):
@@ -58,12 +60,18 @@ class PatchSessionIn(BaseModel):
     expected_revision: ExpectedRevision
     language: Lang | None = None
     preferences: Preferences | None = None
+    ticket_type: TicketType | None = Field(
+        default=None, description="가진 승차권: TRANSIT_CARD · SINGLE_USE(1회용) · EXPRESS_TICKET(직통) · NONE"
+    )
+    refund_status: RefundStatus | None = Field(default=None, description="1회용 교통카드 보증금 환급 여부")
 
 
 class PatchSessionOut(BaseModel):
     session_id: str
     language: Lang
     preferences: Preferences
+    facts: Facts
+    plan: Plan | None = Field(description="승차권 정보가 바뀌면 다시 세운 행동 계획")
     requires_route_refresh: bool
     session: SessionStatus
 
@@ -155,6 +163,7 @@ class MessageIn(BaseModel):
 
 class MessageOut(AgentResponse):
     message_id: str
+    plan: Plan | None = Field(description="현재 행동 계획. 목적지가 정해지면 생깁니다")
     session: SessionStatus
 
 
@@ -251,6 +260,7 @@ class RouteStepOut(BaseModel):
     instruction_ko: str
     pano_id: str | None
     arrow_yaw_deg: float | None
+    plan_step_id: str | None = Field(description="이 구간이 향하는 행동 단계 (plan.steps의 step_id)")
 
 
 class RouteOut(BaseModel):
@@ -265,7 +275,30 @@ class RouteOut(BaseModel):
     path_node_ids: list[str]
     waypoints: list[Waypoint]
     steps: list[RouteStepOut]
+    plan: Plan = Field(
+        description="이 경로가 거치는 행동 단계. 경로가 고른 장소(target_poi_id)와 개찰구 통과 단계가 채워집니다"
+    )
     session: SessionStatus
+
+
+# --- plans ------------------------------------------------------------------------------------
+
+
+class TravelFacts(Facts):
+    location_method: str | None = Field(description="현재 위치를 정한 방법: photo_candidate · manual · step_completed")
+
+
+class PlanStateOut(BaseModel):
+    plan: Plan | None = Field(description="목적지가 정해지기 전에는 null")
+    facts: TravelFacts
+    requires_route_refresh: bool = Field(
+        description="true면 경로가 바뀌어야 하니 `/routes`를 `reroute: true`로 다시 부르세요"
+    )
+    session: SessionStatus
+
+
+class StepActionIn(BaseModel):
+    expected_revision: ExpectedRevision
 
 
 NavigationEventType = Literal["navigation_started", "arrived", "navigation_cancelled"]

@@ -1,7 +1,18 @@
 from fastapi import APIRouter
 from sqlalchemy import select
 
-from app.api.deps import CurrentSession, Db, Maps, advance, check_revision, map_of, status_of
+from app.api.deps import (
+    CurrentSession,
+    Db,
+    Maps,
+    advance,
+    check_revision,
+    facts_of,
+    map_of,
+    plan_of,
+    replan,
+    status_of,
+)
 from app.config import get_settings
 from app.domain.session_state import State, Trigger
 from app.errors import ApiError, ErrorCode
@@ -64,22 +75,38 @@ def create_session(body: CreateSessionIn, db: Db, maps: Maps) -> CreateSessionOu
 
 @router.patch(
     "/sessions/{session_id}",
-    summary="언어·이동 선호 변경",
-    description="언어와 계단 회피 같은 선호만 바꿉니다. 목적지는 바꿀 수 없고 `/messages`로만 지정합니다.",
+    summary="언어·이동 선호·승차권 정보 변경",
+    description=(
+        "언어, 계단 회피·휠체어 같은 선호, 가진 승차권(`ticket_type`)과 보증금 환급 여부(`refund_status`)를"
+        " 바꿉니다. 승차권 정보는 행동 계획의 규칙 조건이라 바뀌면 계획을 다시 세웁니다"
+        " (`plan.missing_facts`에 있던 값을 여기로 보내세요). 목적지는 바꿀 수 없고 `/messages`로만 지정합니다."
+    ),
 )
-def update_session(body: PatchSessionIn, row: CurrentSession) -> PatchSessionOut:
+def update_session(body: PatchSessionIn, row: CurrentSession, maps: Maps) -> PatchSessionOut:
     check_revision(row, body.expected_revision)
+    map_ = map_of(row, maps)
     preferences_changed = body.preferences is not None and body.preferences.model_dump() != row.preferences
     if body.language:
         row.language = body.language
     if body.preferences:
         row.preferences = body.preferences.model_dump()
+
+    before = facts_of(row)
+    if body.ticket_type:
+        row.ticket_type = body.ticket_type
+    if body.refund_status:
+        row.refund_status = body.refund_status
+    facts_changed = facts_of(row) != before
+    plan = replan(row, map_) if facts_changed else plan_of(row)
+
     row.revision += 1
     return PatchSessionOut(
         session_id=row.id,
         language=row.language,
         preferences=Preferences(**row.preferences),
-        requires_route_refresh=preferences_changed and row.active_route_id is not None,
+        facts=facts_of(row),
+        plan=plan,
+        requires_route_refresh=(preferences_changed or facts_changed) and row.active_route_id is not None,
         session=status_of(row),
     )
 

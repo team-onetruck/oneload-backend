@@ -14,6 +14,7 @@ class Tag(StrEnum):
     CONVERSATION = "대화"
     LOCATION = "위치 확인"
     ROUTES = "경로"
+    PLAN = "행동 계획"
 
 
 _TAG_DESCRIPTIONS = {
@@ -23,6 +24,10 @@ _TAG_DESCRIPTIONS = {
     Tag.CONVERSATION: "자연어 질문과 목적지 지정의 단일 진입점입니다.",
     Tag.LOCATION: "사진으로 위치 후보를 찾고, 사용자가 직접 확정합니다.",
     Tag.ROUTES: "확정된 위치에서 목적지까지 단계별 경로를 계산합니다.",
+    Tag.PLAN: (
+        "목적지에 가기 위해 해야 할 일(표 사기, 개찰구 통과, 보증금 환급, 도착)의 순서와 진행 상태입니다."
+        " 규칙은 공식 안내에 근거한 것만 쓰고, 판단에 필요한 정보가 없으면 `missing_facts`로 알려줍니다."
+    ),
 }
 
 DESCRIPTION = """
@@ -42,6 +47,7 @@ DESCRIPTION = """
 돌려주고, 첫 요청이 처리 중이면 `409 REQUEST_IN_PROGRESS`가 옵니다.
 
 대표 길안내 흐름은 `messages` → `location-confirmations` → `routes` → `navigation-events`입니다.
+목적지가 정해지면 행동 계획(`plan`)이 함께 생기고, 단계를 마칠 때마다 `steps/{step_id}/complete`로 알립니다.
 상태를 바꾸는 요청에는 직전 응답의 `session.revision`을 `expected_revision`으로 넣습니다.
 
 **현재 제한**

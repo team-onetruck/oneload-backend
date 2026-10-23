@@ -13,11 +13,13 @@ from app.ai.contracts import Agent, VisionExtractor
 from app.config import get_settings
 from app.db import get_db
 from app.domain.mapdata import MapData, MapStore
+from app.domain.planning import Facts, Plan, build_plan, goal_for
+from app.domain.routing import RouteOptions
 from app.domain.session_state import InvalidTransition, State, Trigger, transition
 from app.errors import ApiError, ErrorCode
 from app.models import SessionRow
-from app.schemas import SessionStatus
-from app.security import sha256_hex
+from app.schemas import Preferences, SessionStatus
+from app.security import new_id, sha256_hex
 
 Db = Annotated[Session, Depends(get_db)]
 
@@ -131,3 +133,37 @@ def read_jpeg(upload: UploadFile) -> bytes:
     if not data.startswith(_JPEG_MAGIC):
         raise ApiError(ErrorCode.UNSUPPORTED_IMAGE, "Images must be JPEG.")
     return data
+
+
+def facts_of(row: SessionRow) -> Facts:
+    return Facts(ticket_type=row.ticket_type, refund_status=row.refund_status, area_state=row.area_state)
+
+
+def store_facts(row: SessionRow, facts: Facts) -> None:
+    row.ticket_type, row.refund_status, row.area_state = facts.ticket_type, facts.refund_status, facts.area_state
+
+
+def plan_of(row: SessionRow) -> Plan | None:
+    return Plan.model_validate(row.plan) if row.plan else None
+
+
+def store_plan(row: SessionRow, plan: Plan | None) -> None:
+    row.plan = plan.model_dump(mode="json") if plan else None
+
+
+def replan(row: SessionRow, map_: MapData) -> Plan | None:
+    """Plan for the session's destination from what we know now; progress on the same trip is kept."""
+    if row.destination_poi_id is None:
+        store_plan(row, None)
+        return None
+    destination = map_.poi_by_id[row.destination_poi_id]
+    previous = plan_of(row)
+    same_trip = previous is not None and previous.destination_poi_id == destination.poi_id
+    goal = previous.goal if same_trip else goal_for(destination)
+    plan = build_plan(map_, goal, destination, facts_of(row), new_id, previous)
+    store_plan(row, plan)
+    return plan
+
+
+def route_options(preferences: Preferences) -> RouteOptions:
+    return RouteOptions(avoid_stairs=preferences.avoid_stairs, wheelchair=preferences.wheelchair)

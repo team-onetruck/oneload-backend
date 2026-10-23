@@ -1,0 +1,582 @@
+{
+  "map_id": "mock-station",
+  "version": "test-1",
+  "name": {
+    "en": "Mock station",
+    "ko": "모의 역"
+  },
+  "provenance": {
+    "note": "Invented for tests: paid and free areas, a closed refund machine, a decoy machine away from the exit, stairs versus elevator, a stairs-only exit."
+  },
+  "coordinate_system": {
+    "unit": "m"
+  },
+  "floors": [
+    {
+      "floor_id": "B2",
+      "elevation_m": -6
+    },
+    {
+      "floor_id": "B1",
+      "elevation_m": 0
+    },
+    {
+      "floor_id": "G",
+      "elevation_m": 6
+    }
+  ],
+  "nodes": [
+    {
+      "id": "platform",
+      "floor_id": "B2",
+      "area": "paid",
+      "position": {
+        "x": 0,
+        "y": -6,
+        "z": 0
+      },
+      "name": {
+        "en": "platform",
+        "ko": "직통열차 승강장"
+      }
+    },
+    {
+      "id": "paid-hall",
+      "floor_id": "B1",
+      "area": "paid",
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "name": {
+        "en": "paid-hall",
+        "ko": "개찰구 안 대합실"
+      }
+    },
+    {
+      "id": "free-hall",
+      "floor_id": "B1",
+      "area": "free",
+      "position": {
+        "x": 10,
+        "y": 0,
+        "z": 0
+      },
+      "name": {
+        "en": "free-hall",
+        "ko": "개찰구 밖 대합실"
+      }
+    },
+    {
+      "id": "refund-closed",
+      "floor_id": "B1",
+      "area": "free",
+      "position": {
+        "x": 11,
+        "y": 0,
+        "z": 0
+      },
+      "name": {
+        "en": "refund-closed",
+        "ko": "고장 난 환급기 앞"
+      }
+    },
+    {
+      "id": "refund-near",
+      "floor_id": "B1",
+      "area": "free",
+      "position": {
+        "x": 10,
+        "y": 0,
+        "z": -10
+      },
+      "name": {
+        "en": "refund-near",
+        "ko": "출구 반대편 환급기 앞"
+      }
+    },
+    {
+      "id": "refund-way",
+      "floor_id": "B1",
+      "area": "free",
+      "position": {
+        "x": 40,
+        "y": 0,
+        "z": 0
+      },
+      "name": {
+        "en": "refund-way",
+        "ko": "출구 가는 길 환급기 앞"
+      }
+    },
+    {
+      "id": "lift",
+      "floor_id": "B1",
+      "area": "free",
+      "position": {
+        "x": 40,
+        "y": 0,
+        "z": 20
+      },
+      "name": {
+        "en": "lift",
+        "ko": "엘리베이터 앞"
+      }
+    },
+    {
+      "id": "exit3",
+      "floor_id": "G",
+      "area": "free",
+      "position": {
+        "x": 65,
+        "y": 6,
+        "z": 0
+      },
+      "name": {
+        "en": "exit3",
+        "ko": "3번 출구"
+      }
+    },
+    {
+      "id": "exit5",
+      "floor_id": "G",
+      "area": "free",
+      "position": {
+        "x": 10,
+        "y": 6,
+        "z": 15
+      },
+      "name": {
+        "en": "exit5",
+        "ko": "5번 출구"
+      }
+    },
+    {
+      "id": "ticket-office",
+      "floor_id": "B1",
+      "area": "free",
+      "position": {
+        "x": 10,
+        "y": 0,
+        "z": 10
+      },
+      "name": {
+        "en": "ticket-office",
+        "ko": "직통열차 표 사는 곳"
+      }
+    },
+    {
+      "id": "ticket-machines",
+      "floor_id": "B1",
+      "area": "free",
+      "position": {
+        "x": 10,
+        "y": 0,
+        "z": 12
+      },
+      "name": {
+        "en": "ticket-machines",
+        "ko": "승차권 발매기"
+      }
+    },
+    {
+      "id": "platform-lift",
+      "floor_id": "B2",
+      "area": "paid",
+      "position": {
+        "x": 2,
+        "y": -6,
+        "z": 0
+      },
+      "name": {
+        "en": "platform-lift",
+        "ko": "승강장 엘리베이터 앞"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "platform",
+      "to": "paid-hall",
+      "type": "escalator",
+      "distance_m": 20,
+      "heading_deg": 0,
+      "instruction": {
+        "en": "platform to paid-hall",
+        "ko": "platform에서 paid-hall로"
+      }
+    },
+    {
+      "from": "paid-hall",
+      "to": "platform",
+      "type": "escalator",
+      "distance_m": 20,
+      "heading_deg": 180,
+      "instruction": {
+        "en": "paid-hall to platform",
+        "ko": "paid-hall에서 platform로"
+      }
+    },
+    {
+      "from": "paid-hall",
+      "to": "free-hall",
+      "type": "gate",
+      "distance_m": 5,
+      "heading_deg": 90,
+      "instruction": {
+        "en": "paid-hall to free-hall",
+        "ko": "paid-hall에서 free-hall로"
+      }
+    },
+    {
+      "from": "free-hall",
+      "to": "paid-hall",
+      "type": "gate",
+      "distance_m": 5,
+      "heading_deg": 270,
+      "instruction": {
+        "en": "free-hall to paid-hall",
+        "ko": "free-hall에서 paid-hall로"
+      }
+    },
+    {
+      "from": "free-hall",
+      "to": "refund-closed",
+      "type": "corridor",
+      "distance_m": 1,
+      "heading_deg": 90,
+      "instruction": {
+        "en": "free-hall to refund-closed",
+        "ko": "free-hall에서 refund-closed로"
+      }
+    },
+    {
+      "from": "refund-closed",
+      "to": "free-hall",
+      "type": "corridor",
+      "distance_m": 1,
+      "heading_deg": 270,
+      "instruction": {
+        "en": "refund-closed to free-hall",
+        "ko": "refund-closed에서 free-hall로"
+      }
+    },
+    {
+      "from": "free-hall",
+      "to": "refund-near",
+      "type": "corridor",
+      "distance_m": 10,
+      "heading_deg": 180,
+      "instruction": {
+        "en": "free-hall to refund-near",
+        "ko": "free-hall에서 refund-near로"
+      }
+    },
+    {
+      "from": "refund-near",
+      "to": "free-hall",
+      "type": "corridor",
+      "distance_m": 10,
+      "heading_deg": 0,
+      "instruction": {
+        "en": "refund-near to free-hall",
+        "ko": "refund-near에서 free-hall로"
+      }
+    },
+    {
+      "from": "free-hall",
+      "to": "refund-way",
+      "type": "corridor",
+      "distance_m": 30,
+      "heading_deg": 90,
+      "instruction": {
+        "en": "free-hall to refund-way",
+        "ko": "free-hall에서 refund-way로"
+      }
+    },
+    {
+      "from": "refund-way",
+      "to": "free-hall",
+      "type": "corridor",
+      "distance_m": 30,
+      "heading_deg": 270,
+      "instruction": {
+        "en": "refund-way to free-hall",
+        "ko": "refund-way에서 free-hall로"
+      }
+    },
+    {
+      "from": "refund-way",
+      "to": "exit3",
+      "type": "stairs",
+      "distance_m": 25,
+      "heading_deg": 90,
+      "instruction": {
+        "en": "refund-way to exit3",
+        "ko": "refund-way에서 exit3로"
+      }
+    },
+    {
+      "from": "exit3",
+      "to": "refund-way",
+      "type": "stairs",
+      "distance_m": 25,
+      "heading_deg": 270,
+      "instruction": {
+        "en": "exit3 to refund-way",
+        "ko": "exit3에서 refund-way로"
+      }
+    },
+    {
+      "from": "refund-way",
+      "to": "lift",
+      "type": "corridor",
+      "distance_m": 20,
+      "heading_deg": 0,
+      "instruction": {
+        "en": "refund-way to lift",
+        "ko": "refund-way에서 lift로"
+      }
+    },
+    {
+      "from": "lift",
+      "to": "refund-way",
+      "type": "corridor",
+      "distance_m": 20,
+      "heading_deg": 180,
+      "instruction": {
+        "en": "lift to refund-way",
+        "ko": "lift에서 refund-way로"
+      }
+    },
+    {
+      "from": "lift",
+      "to": "exit3",
+      "type": "elevator",
+      "distance_m": 30,
+      "heading_deg": 90,
+      "instruction": {
+        "en": "lift to exit3",
+        "ko": "lift에서 exit3로"
+      }
+    },
+    {
+      "from": "exit3",
+      "to": "lift",
+      "type": "elevator",
+      "distance_m": 30,
+      "heading_deg": 270,
+      "instruction": {
+        "en": "exit3 to lift",
+        "ko": "exit3에서 lift로"
+      }
+    },
+    {
+      "from": "free-hall",
+      "to": "exit5",
+      "type": "stairs",
+      "distance_m": 15,
+      "heading_deg": 0,
+      "instruction": {
+        "en": "free-hall to exit5",
+        "ko": "free-hall에서 exit5로"
+      }
+    },
+    {
+      "from": "exit5",
+      "to": "free-hall",
+      "type": "stairs",
+      "distance_m": 15,
+      "heading_deg": 180,
+      "instruction": {
+        "en": "exit5 to free-hall",
+        "ko": "exit5에서 free-hall로"
+      }
+    },
+    {
+      "from": "free-hall",
+      "to": "ticket-office",
+      "type": "corridor",
+      "distance_m": 10,
+      "heading_deg": 0,
+      "instruction": {
+        "en": "free-hall to ticket-office",
+        "ko": "free-hall에서 ticket-office로"
+      }
+    },
+    {
+      "from": "ticket-office",
+      "to": "free-hall",
+      "type": "corridor",
+      "distance_m": 10,
+      "heading_deg": 180,
+      "instruction": {
+        "en": "ticket-office to free-hall",
+        "ko": "ticket-office에서 free-hall로"
+      }
+    },
+    {
+      "from": "free-hall",
+      "to": "ticket-machines",
+      "type": "corridor",
+      "distance_m": 12,
+      "heading_deg": 0,
+      "instruction": {
+        "en": "free-hall to ticket-machines",
+        "ko": "free-hall에서 ticket-machines로"
+      }
+    },
+    {
+      "from": "ticket-machines",
+      "to": "free-hall",
+      "type": "corridor",
+      "distance_m": 12,
+      "heading_deg": 180,
+      "instruction": {
+        "en": "ticket-machines to free-hall",
+        "ko": "ticket-machines에서 free-hall로"
+      }
+    },
+    {
+      "from": "platform",
+      "to": "platform-lift",
+      "type": "corridor",
+      "distance_m": 3,
+      "heading_deg": 90,
+      "instruction": {
+        "en": "platform to platform-lift",
+        "ko": "platform에서 platform-lift로"
+      }
+    },
+    {
+      "from": "platform-lift",
+      "to": "platform",
+      "type": "corridor",
+      "distance_m": 3,
+      "heading_deg": 270,
+      "instruction": {
+        "en": "platform-lift to platform",
+        "ko": "platform-lift에서 platform로"
+      }
+    },
+    {
+      "from": "platform-lift",
+      "to": "paid-hall",
+      "type": "elevator",
+      "distance_m": 25,
+      "heading_deg": 0,
+      "instruction": {
+        "en": "platform-lift to paid-hall",
+        "ko": "platform-lift에서 paid-hall로"
+      }
+    },
+    {
+      "from": "paid-hall",
+      "to": "platform-lift",
+      "type": "elevator",
+      "distance_m": 25,
+      "heading_deg": 180,
+      "instruction": {
+        "en": "paid-hall to platform-lift",
+        "ko": "paid-hall에서 platform-lift로"
+      }
+    }
+  ],
+  "pois": [
+    {
+      "poi_id": "poi-exit3",
+      "node_id": "exit3",
+      "category": "exit",
+      "name": {
+        "en": "poi-exit3",
+        "ko": "3번 출구"
+      },
+      "aliases": [],
+      "verified": true
+    },
+    {
+      "poi_id": "poi-exit5",
+      "node_id": "exit5",
+      "category": "exit",
+      "name": {
+        "en": "poi-exit5",
+        "ko": "5번 출구"
+      },
+      "aliases": [],
+      "verified": true
+    },
+    {
+      "poi_id": "poi-refund-closed",
+      "node_id": "refund-closed",
+      "category": "card_refund",
+      "name": {
+        "en": "poi-refund-closed",
+        "ko": "보증금 환급기 (고장)"
+      },
+      "aliases": [],
+      "verified": true,
+      "closed": true
+    },
+    {
+      "poi_id": "poi-refund-near",
+      "node_id": "refund-near",
+      "category": "card_refund",
+      "name": {
+        "en": "poi-refund-near",
+        "ko": "보증금 환급기 (출구 반대편)"
+      },
+      "aliases": [],
+      "verified": true
+    },
+    {
+      "poi_id": "poi-refund-way",
+      "node_id": "refund-way",
+      "category": "card_refund",
+      "name": {
+        "en": "poi-refund-way",
+        "ko": "보증금 환급기 (출구 가는 길)"
+      },
+      "aliases": [],
+      "verified": true
+    },
+    {
+      "poi_id": "poi-express-tickets",
+      "node_id": "ticket-office",
+      "category": "tickets",
+      "name": {
+        "en": "poi-express-tickets",
+        "ko": "직통열차 표 사는 곳"
+      },
+      "aliases": [],
+      "verified": true,
+      "train_type": "express"
+    },
+    {
+      "poi_id": "poi-allstop-tickets",
+      "node_id": "ticket-machines",
+      "category": "tickets",
+      "name": {
+        "en": "poi-allstop-tickets",
+        "ko": "승차권 발매기"
+      },
+      "aliases": [],
+      "verified": true,
+      "train_type": "allstop"
+    },
+    {
+      "poi_id": "poi-express-platform",
+      "node_id": "platform",
+      "category": "platform",
+      "name": {
+        "en": "poi-express-platform",
+        "ko": "직통열차 승강장"
+      },
+      "aliases": [],
+      "verified": true,
+      "train_type": "express"
+    }
+  ],
+  "landmarks": [],
+  "panoramas": []
+}

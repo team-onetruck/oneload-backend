@@ -18,6 +18,7 @@ from app.api.deps import (
 )
 from app.config import get_settings
 from app.domain.localization import Hints, match_location, retake_hint
+from app.domain.planning import area_state_at
 from app.domain.session_state import State, Trigger, allows
 from app.errors import ApiError, ErrorCode
 from app.models import LocalizationRow
@@ -112,6 +113,8 @@ def confirm_location(body: ConfirmationIn, row: CurrentSession, db: Db, maps: Ma
     advance(row, Trigger.LOCATION_CONFIRMED)
     row.confirmed_node_id = node.id
     row.confirmed_heading_deg = body.selected_heading_deg
+    row.location_method = body.method
+    row.area_state = area_state_at(map_, node.id)
     return ConfirmationOut(
         location=ConfirmedLocation(
             map_id=map_.map_id,

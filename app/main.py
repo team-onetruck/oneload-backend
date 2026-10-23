@@ -8,7 +8,7 @@ from hangil_r2 import LLMAgent, LLMVision, MockKnowledgeSearch, OpenAILLM
 from app.ai.contracts import Agent, VisionExtractor
 from app.ai.rule_agent import RuleAgent
 from app.ai.vision import NoVision
-from app.api import conversation, health, location, maps, routes, sessions
+from app.api import conversation, health, location, maps, plans, routes, sessions
 from app.config import get_settings
 from app.domain.mapdata import MapStore
 from app.errors import install_error_handlers
@@ -49,7 +49,7 @@ def create_app(
     app.state.agent = agent or RuleAgent()
     app.state.vision = vision or NoVision()
 
-    for module in (health, sessions, maps, conversation, location, routes):
+    for module in (health, sessions, maps, conversation, location, routes, plans):
         app.include_router(module.router, prefix=API_PREFIX)
     install_error_handlers(app)
     install_openapi(app)

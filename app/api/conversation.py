@@ -7,8 +7,20 @@ from starlette.datastructures import UploadFile
 
 from app.ai.contracts import AgentContext, AgentResponse, Slots
 from app.ai.guard import guard
-from app.api.deps import AgentDep, CurrentSession, Db, Maps, advance, map_of, read_jpeg, status_of
+from app.api.deps import (
+    AgentDep,
+    CurrentSession,
+    Db,
+    Maps,
+    advance,
+    map_of,
+    plan_of,
+    read_jpeg,
+    replan,
+    status_of,
+)
 from app.config import get_settings
+from app.domain.planning import TicketType
 from app.domain.session_state import Trigger
 from app.errors import ApiError, ErrorCode
 from app.models import MessageRow, SessionRow
@@ -105,11 +117,14 @@ def send_message(
     response = guard(agent.handle_message(ctx, body.message, image, body.selected_poi_id), map_, row.language)
 
     row.slots = response.slots.model_dump()
+    learned_ticket = _ticket_from_card_answer(row, response.slots.has_transit_card)
     if response.status == "relocalize":
         row.confirmed_node_id = None
+        row.location_method = None
     if response.destination:
         row.destination_poi_id = response.destination.poi_id
         row.active_route_id = None
+    plan = replan(row, map_) if response.destination or learned_ticket else plan_of(row)
     advance(row, _TRIGGER[response.status], has_location=row.confirmed_node_id is not None)
 
     message_id = new_id("msg")
@@ -135,7 +150,7 @@ def send_message(
             ),
         ]
     )
-    return MessageOut(**response.model_dump(), message_id=message_id, session=status_of(row))
+    return MessageOut(**response.model_dump(), message_id=message_id, plan=plan, session=status_of(row))
 
 
 @router.get(
@@ -186,3 +201,12 @@ def _recent_messages(db: Db, row: SessionRow) -> list[tuple[str, str]]:
         .limit(get_settings().recent_messages)
     ).all()
     return [(m.role, m.content) for m in reversed(rows)]
+
+
+def _ticket_from_card_answer(row: SessionRow, has_transit_card: str) -> bool:
+    """The agent's yes/no about a transit card settles an unknown ticket type. Returns True if it did."""
+    learned = {"yes": TicketType.TRANSIT_CARD, "no": TicketType.NONE}.get(has_transit_card)
+    if learned is None or row.ticket_type != TicketType.UNKNOWN:
+        return False
+    row.ticket_type = learned
+    return True

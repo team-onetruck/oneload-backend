@@ -8,7 +8,26 @@ from dataclasses import dataclass
 
 import networkx as nx
 
-from app.domain.mapdata import Edge, MapData, Text
+from app.domain.mapdata import Edge, EdgeType, MapData, Text
+
+_NOT_STEP_FREE: frozenset[EdgeType] = frozenset({"stairs"})
+# A wheelchair cannot use escalators either; elevators, gates and corridors are assumed usable.
+_NOT_WHEELCHAIR: frozenset[EdgeType] = frozenset({"stairs", "escalator"})
+
+
+@dataclass(frozen=True)
+class RouteOptions:
+    avoid_stairs: bool = False
+    wheelchair: bool = False
+
+    @property
+    def excluded_edge_types(self) -> frozenset[EdgeType]:
+        if self.wheelchair:
+            return _NOT_WHEELCHAIR
+        return _NOT_STEP_FREE if self.avoid_stairs else frozenset()
+
+
+ANY_PASSAGE = RouteOptions()
 
 
 @dataclass(frozen=True)
@@ -21,12 +40,16 @@ class RouteStep:
     instruction: Text
     pano_id: str | None
     arrow_yaw_deg: float | None
+    # Which stop this step walks towards (index into the stops passed to plan_route_via).
+    leg: int
 
 
 @dataclass(frozen=True)
 class PlannedRoute:
     path_node_ids: list[str]
     steps: list[RouteStep]
+    # The node chosen for each stop, in order.
+    stop_node_ids: list[str]
 
     @property
     def distance_m(self) -> float:
@@ -34,26 +57,66 @@ class PlannedRoute:
 
 
 def plan_route(
-    map_: MapData, start_node_id: str, goal_node_id: str, *, avoid_stairs: bool = False
+    map_: MapData, start_node_id: str, goal_node_id: str, options: RouteOptions = ANY_PASSAGE
 ) -> PlannedRoute | None:
-    graph = nx.DiGraph()
-    for edge in map_.edges:
-        graph.add_edge(edge.from_, edge.to, edge=edge)
+    return plan_route_via(map_, start_node_id, [[goal_node_id]], options)
 
-    def cost(_u: str, _v: str, data: dict) -> float | None:
-        edge: Edge = data["edge"]
-        return None if avoid_stairs and edge.type == "stairs" else edge.distance_m  # None hides the edge
 
-    try:
-        path = nx.dijkstra_path(graph, start_node_id, goal_node_id, weight=cost)
-    except (nx.NetworkXNoPath, nx.NodeNotFound):
+def plan_route_via(
+    map_: MapData, start_node_id: str, stops: list[list[str]], options: RouteOptions = ANY_PASSAGE
+) -> PlannedRoute | None:
+    """Cheapest walk from the start through one node of each stop, in order, ending at the last stop.
+
+    Each stop lists interchangeable nodes (e.g. every open refund machine). The choice is made for
+    the whole walk, not leg by leg: the nearest machine can be the wrong one if it lies away from
+    the exit. Returns None when some stop cannot be reached.
+    """
+    graph = _graph(map_, options)
+    if start_node_id not in graph:
         return None
 
+    # Cheapest way found so far to stand on each node of the current stop: (meters, path, stop path indexes).
+    best: dict[str, tuple[float, list[str], list[int]]] = {start_node_id: (0.0, [start_node_id], [])}
+    for candidates in stops:
+        reached: dict[str, tuple[float, list[str], list[int]]] = {}
+        for origin, (meters, path, stop_at) in best.items():
+            lengths, paths = nx.single_source_dijkstra(graph, origin, weight="distance_m")
+            for node in candidates:
+                if node not in lengths:
+                    continue
+                total = meters + lengths[node]
+                if node not in reached or total < reached[node][0]:
+                    walk = path + paths[node][1:]
+                    reached[node] = (total, walk, [*stop_at, len(walk) - 1])
+        if not reached:
+            return None
+        best = reached
+
+    _, path, stop_at = min(best.values(), key=lambda found: found[0])
     edges = [graph.edges[u, v]["edge"] for u, v in zip(path, path[1:], strict=False)]
-    return PlannedRoute(path_node_ids=path, steps=[_step(map_, i, e) for i, e in enumerate(edges, start=1)])
+    return PlannedRoute(
+        path_node_ids=path,
+        steps=[_step(map_, i, edge, _leg(i - 1, stop_at)) for i, edge in enumerate(edges, start=1)],
+        stop_node_ids=[path[i] for i in stop_at],
+    )
 
 
-def _step(map_: MapData, index: int, edge: Edge) -> RouteStep:
+def _graph(map_: MapData, options: RouteOptions) -> nx.DiGraph:
+    graph = nx.DiGraph()
+    graph.add_nodes_from(n.id for n in map_.nodes)
+    excluded = options.excluded_edge_types
+    for edge in map_.edges:
+        if not edge.closed and edge.type not in excluded:
+            graph.add_edge(edge.from_, edge.to, edge=edge, distance_m=edge.distance_m)
+    return graph
+
+
+def _leg(edge_index: int, stop_at: list[int]) -> int:
+    """The stop an edge leads towards: the first stop reached at or after the edge's end."""
+    return next(leg for leg, path_index in enumerate(stop_at) if edge_index < path_index)
+
+
+def _step(map_: MapData, index: int, edge: Edge, leg: int) -> RouteStep:
     pano = map_.panorama_by_node.get(edge.from_)
     return RouteStep(
         step_id=f"s{index}",
@@ -65,6 +128,7 @@ def _step(map_: MapData, index: int, edge: Edge) -> RouteStep:
         pano_id=pano.pano_id if pano else None,
         # Where the next leg points inside this photo: the photo's north plus the leg's map bearing.
         arrow_yaw_deg=_wrap_degrees(pano.north_yaw_deg + edge.heading_deg) if pano else None,
+        leg=leg,
     )
 
 

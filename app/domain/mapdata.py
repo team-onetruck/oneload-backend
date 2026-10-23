@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 Lang = Literal["en", "ko"]
 TrainType = Literal["express", "allstop"]
 EdgeType = Literal["corridor", "escalator", "stairs", "elevator", "gate"]
+Area = Literal["paid", "free"]
 
 
 class Text(BaseModel):
@@ -39,6 +40,8 @@ class Node(BaseModel):
     floor_id: str
     position: Position
     name: Text
+    # Fare zone: inside the ticket gates ("paid") or outside ("free"); None until surveyed.
+    area: Area | None = None
 
 
 class Edge(BaseModel):
@@ -50,6 +53,8 @@ class Edge(BaseModel):
     distance_m: float
     heading_deg: float
     instruction: Text
+    # Temporarily impassable (construction, closed gate): never routed through.
+    closed: bool = False
 
 
 class Poi(BaseModel):
@@ -60,6 +65,8 @@ class Poi(BaseModel):
     name: Text
     aliases: list[str] = []
     verified: bool
+    # Out of service (broken machine, closed office): never chosen as a stop.
+    closed: bool = False
 
 
 class Landmark(BaseModel):
@@ -123,6 +130,17 @@ class MapData(BaseModel):
         """POIs the agent may set as a destination; unverified ones never reach a user."""
         poi = self.poi_by_id.get(poi_id)
         return poi if poi and poi.verified else None
+
+    def open_pois(self, category: str, train_type: TrainType | None = None) -> list[Poi]:
+        """Verified, open POIs of one kind: the places a plan step may send the user to."""
+        return [
+            p
+            for p in self.pois
+            if p.verified
+            and not p.closed
+            and p.category == category
+            and (train_type is None or p.train_type == train_type)
+        ]
 
     def search_pois(self, query: str = "") -> list[Poi]:
         q = query.strip().lower()

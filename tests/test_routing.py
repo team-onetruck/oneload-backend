@@ -1,5 +1,5 @@
 from app.domain.mapdata import MapData
-from app.domain.routing import plan_route
+from app.domain.routing import RouteOptions, plan_route
 
 
 def test_route_follows_registered_passages_with_street_view_arrows(seoul):
@@ -70,4 +70,4 @@ def test_avoid_stairs_takes_the_longer_step_free_route():
     )
 
     assert plan_route(map_, "a", "b").path_node_ids == ["a", "b"]
-    assert plan_route(map_, "a", "b", avoid_stairs=True).path_node_ids == ["a", "lift", "b"]
+    assert plan_route(map_, "a", "b", RouteOptions(avoid_stairs=True)).path_node_ids == ["a", "lift", "b"]

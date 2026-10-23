@@ -1,7 +1,19 @@
 from fastapi import APIRouter
 
-from app.api.deps import CurrentSession, Db, Maps, advance, check_map_version, check_revision, map_of, status_of
-from app.domain.routing import plan_route
+from app.api.deps import (
+    CurrentSession,
+    Db,
+    Maps,
+    advance,
+    check_map_version,
+    check_revision,
+    map_of,
+    replan,
+    route_options,
+    status_of,
+    store_plan,
+)
+from app.domain.planning import StepStatus, route_plan
 from app.domain.session_state import Trigger
 from app.errors import ApiError, ErrorCode
 from app.models import RouteRow
@@ -16,9 +28,12 @@ router = APIRouter(tags=[Tag.ROUTES])
     "/sessions/{session_id}/routes",
     summary="경로 계산",
     description=(
-        "확정된 현재 위치에서 세션 목적지까지, 등록된 통로만으로 단계별 경로를 만듭니다."
-        " 각 단계에는 거리뷰 사진(`pano_id`)과 그 사진 위 화살표 방향(`arrow_yaw_deg`)이 붙습니다."
-        " 목적지는 `/messages`에서 정해진 것과 같아야 하고, 길을 잃은 뒤 다시 계산할 때는 `reroute: true`를 보냅니다."
+        "확정된 현재 위치에서 세션 목적지까지, 행동 계획(`plan`)의 단계를 차례로 거치는 경로를"
+        " 등록된 통로만으로 만듭니다. 같은 일을 할 수 있는 장소가 여럿이면(예: 보증금 환급기) 각 구간이 아니라"
+        " 전체 이동 거리가 가장 짧은 곳을 고르고, 지나는 개찰구마다 `PASS_GATE` 단계를 넣습니다."
+        " 추천 단계는 사용자가 수락한 경우에만 경로에 들어갑니다. 각 구간에는 거리뷰 사진(`pano_id`),"
+        " 화살표 방향(`arrow_yaw_deg`), 해당 행동 단계(`plan_step_id`)가 붙습니다. 목적지는 `/messages`에서"
+        " 정해진 것과 같아야 하고, 위치가 바뀌었거나 길을 잃은 뒤에는 `reroute: true`로 다시 부릅니다."
     ),
 )
 def create_route(body: RouteIn, row: CurrentSession, db: Db, maps: Maps) -> RouteOut:
@@ -39,14 +54,21 @@ def create_route(body: RouteIn, row: CurrentSession, db: Db, maps: Maps) -> Rout
         raise ApiError(ErrorCode.LOCATION_NOT_CONFIRMED, "Confirm the current location first.")
 
     preferences = body.preferences or Preferences(**row.preferences)
-    goal = map_.poi_by_id[body.destination_poi_id].node_id
-    planned = plan_route(map_, row.confirmed_node_id, goal, avoid_stairs=preferences.avoid_stairs)
-    if planned is None:
+    plan = replan(row, map_)
+    routed = route_plan(map_, plan, row.confirmed_node_id, route_options(preferences), new_id)
+    if routed is None:
         raise ApiError(
             ErrorCode.ROUTE_NOT_FOUND,
-            "No registered route from here.",
-            {"start_node_id": row.confirmed_node_id, "avoid_stairs": preferences.avoid_stairs},
+            "No registered route from here through the plan's steps.",
+            {
+                "start_node_id": row.confirmed_node_id,
+                "avoid_stairs": preferences.avoid_stairs,
+                "wheelchair": preferences.wheelchair,
+                "blocked_step_ids": [s.step_id for s in plan.steps if s.status == StepStatus.BLOCKED],
+            },
         )
+    store_plan(row, plan)
+    route = routed.route
 
     advance(row, Trigger.ROUTE_CREATED)
 
@@ -61,13 +83,13 @@ def create_route(body: RouteIn, row: CurrentSession, db: Db, maps: Maps) -> Rout
         map_version=map_.version,
         start_node_id=row.confirmed_node_id,
         destination_poi_id=body.destination_poi_id,
-        distance_m=planned.distance_m,
-        path_node_ids=planned.path_node_ids,
+        distance_m=route.distance_m,
+        path_node_ids=route.path_node_ids,
         waypoints=[
             Waypoint(
                 waypoint_id=f"w{i}", floor_id=map_.node_by_id[n].floor_id, position_map_m=map_.node_by_id[n].position
             )
-            for i, n in enumerate(planned.path_node_ids, start=1)
+            for i, n in enumerate(route.path_node_ids, start=1)
         ],
         steps=[
             RouteStepOut(
@@ -80,9 +102,11 @@ def create_route(body: RouteIn, row: CurrentSession, db: Db, maps: Maps) -> Rout
                 instruction_ko=s.instruction.ko,
                 pano_id=s.pano_id,
                 arrow_yaw_deg=s.arrow_yaw_deg,
+                plan_step_id=plan_step_id,
             )
-            for s in planned.steps
+            for s, plan_step_id in zip(route.steps, routed.plan_step_ids, strict=True)
         ],
+        plan=plan,
         session=status_of(row),
     )
 
