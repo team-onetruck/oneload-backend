@@ -32,7 +32,8 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-# Local development pin. CI and deploys replace it with oneload_agent main; refresh it with
-# uv add "oneload-agent @ https://github.com/team-onetruck/oneload_agent/archive/<commit>.tar.gz"
+# Local development uses the oneload_agent checkout next to this repo, editable, so a `git pull`
+# there (or an edit) takes effect without touching this file. CI and deploys cannot see that folder
+# and pin oneload_agent main by URL instead (see README).
 [tool.uv.sources]
-oneload-agent = { url = "https://github.com/team-onetruck/oneload_agent/archive/7f116deac946479cdacaa5d9ade87d5e9829d051.tar.gz" }
+oneload-agent = { path = "../oneload_agent", editable = true }

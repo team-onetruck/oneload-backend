@@ -25,11 +25,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      # Deploys run oneload_agent main, not the pin in pyproject.toml, so test against that.
-      - name: Use oneload_agent main
-        run: |
-          sha=$(git ls-remote https://github.com/team-onetruck/oneload_agent refs/heads/main | cut -f1)
-          uv add --no-sync "oneload-agent @ https://github.com/team-onetruck/oneload_agent/archive/$sha.tar.gz"
+      # No ../oneload_agent here; test against oneload_agent main, which is what deploys run.
+      - run: scripts/pin_agent.sh
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -49,6 +46,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: scripts/pin_agent.sh # the build context has no ../oneload_agent
       - run: docker build -t hangil-api:ci .
 
   deploy:

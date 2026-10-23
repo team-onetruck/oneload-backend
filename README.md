@@ -8,15 +8,18 @@ This repo holds code only. Map data and photos live in [oneload-data](https://gi
 
 ## Run locally
 
-Clone oneload-data next to this repo (the default `MAP_DIR` is `../oneload-data/maps`):
+Clone oneload-data and oneload_agent next to this repo. The default `MAP_DIR` is `../oneload-data/maps`, and the agent is installed from `../oneload_agent` as an editable package, so `git pull` in that folder (or an edit there) is picked up on the next start with no change here:
 
 ```sh
 git clone https://github.com/team-onetruck/oneload-data ../oneload-data
+git clone https://github.com/team-onetruck/oneload_agent ../oneload_agent
 docker compose up -d --wait          # Postgres 17 + pgvector on 127.0.0.1:54329
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload # http://127.0.0.1:8000/api/v1/docs
 ```
+
+The OpenAI agent turns on when the `OPENAI_API_KEY` environment variable is set when the API starts (`export OPENAI_API_KEY=...`; the backend's `.env` is not read for it). Without it the API uses `RuleAgent` and `NoVision`.
 
 ```sh
 uv run pytest            # creates and uses hangil_test; override with TEST_DATABASE_URL
@@ -53,7 +56,7 @@ Settings come from environment variables or `.env` (see `app/config.py`): `DATAB
 
 `.github/workflows/ci.yml` runs lint and tests on every push, checks that the current oneload-data still loads with this code, and builds the `Dockerfile` to catch image breakage. On `main` the `deploy` job calls oneload-infra's shared deploy workflow on this repo's self-hosted runner on macserver. It deploys `main` of every repo: it builds the API image (with oneload_agent `main`) and the web image (oneload-app) on the server and runs them with Postgres as the compose project `hangil` (details and the Portainer dashboard in oneload-infra). oneload-app and oneload_agent call the same deploy from their own CI and runners.
 
-The oneload_agent pin in `pyproject.toml` is for local development only: CI and deploys replace it with oneload_agent `main`, so tests always run against the agent that will be deployed.
+CI and the deploy have no `../oneload_agent` checkout, so `scripts/pin_agent.sh` first rewrites the agent source to oneload_agent `main` by URL (never committed). Tests therefore always run against the agent that will be deployed. Run it before a local `docker build` too, then `git checkout pyproject.toml uv.lock`.
 
 Redeploy by hand (after editing data, infra or a secret):
 
