@@ -3,7 +3,8 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from hangil_r2 import LLMAgent, LLMVision, MockKnowledgeSearch, OpenAILLM
+from hangil_r2 import LLMAgent, LLMVision, OpenAILLM
+from hangil_rag import search_knowledge
 
 from app.ai.contracts import Agent, VisionExtractor
 from app.ai.rule_agent import RuleAgent
@@ -26,7 +27,7 @@ def production_ai() -> tuple[Agent, VisionExtractor]:
 
     llm = OpenAILLM()
     vision = LLMVision(llm)
-    agent = LLMAgent(llm, search_knowledge=MockKnowledgeSearch(), vision=vision, fallback=RuleAgent())
+    agent = LLMAgent(llm, search_knowledge=search_knowledge, vision=vision, fallback=RuleAgent())
     return agent, vision
 
 

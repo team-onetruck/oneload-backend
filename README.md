@@ -67,9 +67,11 @@ Once `/messages` sets a destination, the session gets a **plan**: the steps to r
 | Agent (`/messages`) | R2 `LLMAgent` + `OpenAILLM` when `OPENAI_API_KEY` is set | Missing key: `RuleAgent` |
 | Photo → text (`/localizations`) | R2 `LLMVision` using the same OpenAI client | Missing key: `NoVision` → 503 and manual selection |
 | Text → location | Deterministic `match_location` | Unchanged |
-| Knowledge (RAG) | Packaged `MockKnowledgeSearch` demo documents | Replace with the R3 pgvector service |
+| Knowledge (RAG) | R3 `hangil_rag.search_knowledge` (oneload-rag `v0.3.0`, in-memory search over its official documents) | `RAG_BACKEND=pgvector` switches it to pgvector; not used yet (in-memory scored better in R3's evaluation) |
 
 `app/main.py` selects the OpenAI components at process startup. The API endpoints and response schemas do not change.
+
+`hangil-rag` is pinned to a release tag by URL in `pyproject.toml` (the slim image has no git). To take a new R3 release, change the tag there and run `uv lock`.
 
 ## CI and deploy
 

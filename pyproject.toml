@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.1",
     "fastapi>=0.159.1",
+    "hangil-rag",
     "networkx>=3.7",
     "oneload-agent",
     "psycopg[binary]>=3.3.6",
@@ -37,3 +38,5 @@ testpaths = ["tests"]
 # and pin oneload_agent main by URL instead (see README).
 [tool.uv.sources]
 oneload-agent = { path = "../oneload_agent", editable = true }
+# R3 search, pinned to a release tag by URL (the slim image has no git).
+hangil-rag = { url = "https://github.com/team-onetruck/oneload-rag/archive/refs/tags/v0.3.0.tar.gz" }
