@@ -92,10 +92,12 @@ def update_session(body: PatchSessionIn, row: CurrentSession, maps: Maps) -> Pat
         row.preferences = body.preferences.model_dump()
 
     before = facts_of(row)
-    if body.ticket_type:
-        row.ticket_type = body.ticket_type
-    if body.refund_status:
-        row.refund_status = body.refund_status
+    reported = {"ticket_type": body.ticket_type, "refund_status": body.refund_status}
+    for fact, value in reported.items():
+        if value:
+            setattr(row, fact, value)
+    # A new list, so SQLAlchemy sees the JSON column change.
+    row.client_facts = sorted({*row.client_facts, *(fact for fact, value in reported.items() if value)})
     facts_changed = facts_of(row) != before
     plan = replan(row, map_) if facts_changed else plan_of(row)
 

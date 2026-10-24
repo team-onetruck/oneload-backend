@@ -1,7 +1,9 @@
 """The action plan through the HTTP API, on the invented mock station (see test_planning.py)."""
 
+from collections.abc import Iterator
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.ai.contracts import AgentResponse, AgentResult, Destination, Slots
@@ -134,32 +136,66 @@ def test_the_agents_card_answer_fills_in_the_ticket_type(api: Api):
     assert facts["ticket_type"] == "NONE"
 
 
-class _SaysSingleUseNotRefunded:
-    """An agent that heard "I have a single-use card and haven't refunded it, take me to exit 3"."""
+class _ExitAgent:
+    """Always heads for exit 3; the user's message is the single-use card answer as the agent's slots.
+
+    "card, not refunded" → has_single_use_card=yes, single_use_card_returned=no
+    "card, refunded"     → has_single_use_card=yes, single_use_card_returned=yes
+    """
 
     def handle_message(self, ctx, message, image, selected_poi_id) -> AgentResult:
+        returned = "yes" if message == "card, refunded" else "no"
         response = AgentResponse(
             status="destination_set",
             intent="navigate_to_exit",
             assistant_message="3번 출구로 안내할게요.",
-            slots=Slots(has_single_use_card="yes", single_use_card_returned="no"),
+            slots=Slots(has_single_use_card="yes", single_use_card_returned=returned),
             destination=Destination(poi_id="poi-exit3"),
             next_action="locate",
         )
         return AgentResult(response, frozenset())
 
 
-def test_ticket_facts_told_to_the_agent_reach_the_plan_without_overriding_the_client(mock_station):
-    store = MapStore([mock_station])
-    with TestClient(create_app(map_store=store, agent=_SaysSingleUseNotRefunded(), vision=FakeVision())) as http:
-        heard = Api(http=http, vision=FakeVision(), map_id=mock_station.map_id)
-        heard.start()
-        told_by_agent = heard.say("1회용 카드 있고 환급 안 했어요. 3번 출구")
+@pytest.fixture
+def exit_api(mock_station) -> Iterator[Api]:
+    app = create_app(map_store=MapStore([mock_station]), agent=_ExitAgent(), vision=FakeVision())
+    with TestClient(app) as http:
+        api = Api(http=http, vision=FakeVision(), map_id=mock_station.map_id)
+        api.start()
+        yield api
 
-        client_set = Api(http=http, vision=FakeVision(), map_id=mock_station.map_id)
-        client_set.start()
-        _patch(client_set, ticket_type="TRANSIT_CARD")
-        kept = client_set.say("1회용 카드 있고 환급 안 했어요. 3번 출구")
 
-    assert [s["type"] for s in told_by_agent["plan"]["steps"]] == ["REFUND_SINGLE_USE_CARD", "MOVE_TO_DESTINATION"]
-    assert [s["type"] for s in kept["plan"]["steps"]] == ["MOVE_TO_DESTINATION"]
+def _refund_steps(plan: dict[str, Any]) -> list[str]:
+    return [s["status"] for s in plan["steps"] if s["type"] == "REFUND_SINGLE_USE_CARD"]
+
+
+def test_a_later_answer_in_the_conversation_updates_the_plan(exit_api: Api):
+    not_yet = exit_api.say("card, not refunded")
+    done = exit_api.say("card, refunded")  # issue #2: no PATCH, the user just says it now
+
+    facts = exit_api.http.get(exit_api.url("/plan"), headers=exit_api.headers()).json()["facts"]
+    assert _refund_steps(not_yet["plan"]) == ["PENDING"]
+    assert (facts["ticket_type"], facts["refund_status"]) == ("SINGLE_USE", "REFUNDED")
+    assert _refund_steps(done["plan"]) == []
+
+
+def test_facts_the_client_set_are_not_overridden_by_the_conversation(exit_api: Api):
+    _patch(exit_api, ticket_type="TRANSIT_CARD", refund_status="NOT_REFUNDED")
+    exit_api.say("card, refunded")
+
+    facts = exit_api.http.get(exit_api.url("/plan"), headers=exit_api.headers()).json()["facts"]
+    assert (facts["ticket_type"], facts["refund_status"]) == ("TRANSIT_CARD", "NOT_REFUNDED")
+
+
+def test_an_earlier_answer_does_not_undo_a_finished_refund(exit_api: Api):
+    offered = exit_api.say("card, not refunded")["plan"]["steps"][0]
+    _stand_at(exit_api, "free-hall")
+    _act(exit_api, offered["step_id"], "accept")
+    _route(exit_api, "poi-exit3")
+    _act(exit_api, offered["step_id"], "complete")
+
+    again = exit_api.say("card, not refunded")  # same slots as before: no new answer
+
+    facts = exit_api.http.get(exit_api.url("/plan"), headers=exit_api.headers()).json()["facts"]
+    assert facts["refund_status"] == "REFUNDED"
+    assert _refund_steps(again["plan"]) == ["COMPLETED"]

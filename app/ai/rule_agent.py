@@ -30,42 +30,43 @@ ALLSTOP_PLATFORM = "poi-allstop-platform"
 Tip = Literal["express_pay", "tap_card", "buy_single"]
 Say = Callable[[str, str], str]
 
-# (document_id, title en, title ko, url, verified_at). "Demo doc" entries stand in for R3's knowledge base.
+# (document_id, title en, title ko, url, verified_at). The doc-* entries are R3's knowledge documents
+# (oneload-rag/knowledge, same ids and titles), so a fallback answer cites what the LLM agent would.
 _SOURCES = {
     "floors": (
-        "arex-official-seoul-floors",
-        "AREX official guide: Seoul Station",
-        "AREX 공식 안내: 서울역",
-        "https://www.airportrailroad.com/co/steUsfGud.do",
-        "2026-10-22",
+        "arex-official-seoul-station",
+        "AREX official station guide: Seoul",
+        "공항철도 공식 역 안내: 서울역",
+        "https://www.airportrailroad.com/train/normal/info/010/0",
+        "2026-10-23",
     ),
     "train_types": (
         "doc-arex-train-types",
-        "AREX train types (demo doc)",
-        "공항철도 열차 종류 (데모 문서)",
-        None,
-        "2026-10-15",
+        "AREX train types: Express and All-stop",
+        "공항철도 열차 종류 - 직통열차와 일반열차",
+        "https://www.airportrailroad.com/train/express/introduce",
+        "2026-10-22",
     ),
     "express_ticket": (
         "doc-express-ticket",
-        "Buying an express ticket (demo doc)",
-        "직통열차 승차권 구매 (데모 문서)",
-        None,
-        "2026-10-15",
+        "Buying an Express train ticket at Seoul Station",
+        "직통열차 승차권 구매 (서울역)",
+        "https://www.airportrailroad.com/train/express/introduce",
+        "2026-10-23",
     ),
     "allstop_ticket": (
         "doc-allstop-ticket",
-        "Riding the all-stop train (demo doc)",
-        "일반열차 이용 (데모 문서)",
-        None,
-        "2026-10-15",
+        "Riding the All-stop train: transit cards and single-journey tickets",
+        "일반열차 타는 방법 - 교통카드와 1회용 교통카드",
+        "https://www.airportrailroad.com/train/normal/introduce",
+        "2026-10-23",
     ),
     "deposit": (
         "doc-deposit-refund",
-        "Single-journey card refund (demo doc)",
-        "1회용 교통카드 보증금 환급 (데모 문서)",
-        None,
-        "2026-10-12",
+        "Getting the single-journey ticket deposit back",
+        "1회용 교통카드 보증금 환급",
+        "https://news.seoul.go.kr/traffic/archives/1763",
+        "2026-10-22",
     ),
 }
 
@@ -296,22 +297,23 @@ def _pay(say: Say, slots: Slots) -> AgentResponse:
         "열차에 따라 달라요.",
         items=[
             say(
-                "Express: buy a ticket at the counter or machine on B2. Card or cash.",
-                "직통열차: B2 표 사는 곳(창구·발매기)에서 승차권 구매. 카드 또는 현금.",
+                "Express: buy a ticket on B2, at the Express customer center or a ticket machine. "
+                "Machines take cash or credit cards, including foreign ones.",
+                "직통열차: B2 직통열차 고객안내센터나 발매기에서 승차권 구매. 발매기는 현금·신용카드(해외 카드 포함).",
             ),
             say(
                 "All-stop with a transit card: just tap it at the gate on B3.",
                 "일반열차 + 교통카드: B3 개찰구에서 카드만 찍으면 돼요.",
             ),
             say(
-                "All-stop without a card: buy a single-journey ticket at the machine on B3.",
-                "일반열차 + 카드 없음: B3 발매기에서 1회용 교통카드를 사요.",
+                "All-stop without a card: buy a single-journey ticket at the machine on B3, by cash or credit card.",
+                "일반열차 + 카드 없음: B3 발매기에서 1회용 교통카드를 사요. 현금이나 신용카드로 낼 수 있어요.",
             ),
         ],
         unverified_notes=[
             say(
-                "Which machines here accept credit cards is not confirmed yet. Keep some cash (won) just in case.",
-                "여기 발매기 중 신용카드가 되는 기계는 아직 확인 전이에요. 혹시 모르니 현금(원화)을 조금 준비하세요.",
+                "Which payment methods the Express counter itself accepts is not confirmed yet.",
+                "직통열차 창구에서 쓸 수 있는 결제 수단은 아직 확인 전이에요.",
             )
         ],
         suggested_replies=[
@@ -333,8 +335,11 @@ def _what_card(say: Say, slots: Slots) -> AgentResponse:
         "for the subway, buses and the AREX All-stop train.",
         "교통카드(대표적으로 티머니)는 지하철·버스·공항철도 일반열차에 쓰는 충전식 카드예요.",
         items=[
-            say("Buy one at a convenience store or a station machine.", "편의점이나 역 발매기에서 살 수 있어요."),
-            say("Top it up with cash.", "현금으로 충전해요."),
+            say(
+                "Buy one at a convenience store or a transit card machine.",
+                "편의점이나 교통카드 자판기에서 살 수 있어요.",
+            ),
+            say("Top it up at a ticket machine in the station.", "역의 승차권 발매기에서 충전해요."),
             say("Tap it when you enter and again when you leave.", "들어갈 때 한 번, 나올 때 한 번 찍어요."),
         ],
         unverified_notes=[
@@ -428,7 +433,7 @@ def _buy(say: Say, slots: Slots, has_image: bool) -> AgentResponse:
             say("Switch the screen to English.", "화면 언어를 바꾸세요."),
             say("Choose Single journey ticket.", "1회용 교통카드를 고르세요."),
             say("Choose Incheon Airport as your destination.", "목적지로 인천공항을 고르세요."),
-            say("Insert cash and take the card.", "현금을 넣고 카드를 받으세요."),
+            say("Pay by cash or credit card and take the card.", "현금이나 신용카드로 결제하고 카드를 받으세요."),
         ]
     )
     intro_en, intro_ko = (

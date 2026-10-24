@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Identity, Integer, String, Text, func
+from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Identity, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -30,10 +30,12 @@ class SessionRow(Base):
     preferences: Mapped[dict[str, Any]] = mapped_column(JSON)
 
     # What the planner knows about the traveller (app.domain.planning enums). The client reports
-    # them, finished steps update them, and nothing guesses them.
+    # them, the user's answers to the agent and finished steps update them, and nothing guesses them.
     ticket_type: Mapped[str] = mapped_column(String(16), default="UNKNOWN", server_default="UNKNOWN")
     refund_status: Mapped[str] = mapped_column(String(16), default="UNKNOWN", server_default="UNKNOWN")
     area_state: Mapped[str] = mapped_column(String(16), default="UNKNOWN", server_default="UNKNOWN")
+    # Facts the client set with PATCH /sessions; answers given in the conversation never override them.
+    client_facts: Mapped[list[str]] = mapped_column(JSON, default=list, server_default=text("'[]'"))
     # How the current location was set: photo_candidate, manual or step_completed.
     location_method: Mapped[str | None] = mapped_column(String(24))
     plan: Mapped[dict[str, Any] | None] = mapped_column(JSON)

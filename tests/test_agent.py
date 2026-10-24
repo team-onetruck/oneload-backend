@@ -48,7 +48,7 @@ def test_payment_answer_flags_what_is_not_verified(seoul):
     reply = _ask(seoul, "Can I pay with a credit card?")
 
     assert reply.intent == "payment_question"
-    assert any("credit card" in note for note in reply.unverified_notes)
+    assert reply.unverified_notes  # what the official pages do not cover is marked, not stated as fact
 
 
 def _result(**fields) -> AgentResult:

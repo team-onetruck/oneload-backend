@@ -116,8 +116,9 @@ def send_message(
     )
     response = guard(agent.handle_message(ctx, body.message, image, body.selected_poi_id), map_, row.language)
 
+    before = Slots(**row.slots)
     row.slots = response.slots.model_dump()
-    learned = _learn_facts(row, response.slots)
+    learned = _learn_facts(row, before, response.slots)
     if response.status == "relocalize":
         row.confirmed_node_id = None
         row.location_method = None
@@ -203,21 +204,29 @@ def _recent_messages(db: Db, row: SessionRow) -> list[tuple[str, str]]:
     return [(m.role, m.content) for m in reversed(rows)]
 
 
-def _learn_facts(row: SessionRow, slots: Slots) -> bool:
-    """What the user told the agent about their ticket fills facts the planner did not know yet.
+_TICKET_BY_CARD_ANSWER = {"yes": TicketType.TRANSIT_CARD, "no": TicketType.NONE}
+_REFUND_BY_ANSWER = {"yes": RefundStatus.REFUNDED, "no": RefundStatus.NOT_REFUNDED}
 
-    Facts the client already set (PATCH /sessions) are never overwritten. Returns True if any changed.
+
+def _learn_facts(row: SessionRow, before: Slots, after: Slots) -> bool:
+    """New answers the user gave the agent this turn update the planner's facts.
+
+    Only slots that changed this turn count, so an earlier answer never undoes a step the user has
+    since finished, and facts the client set with PATCH /sessions stay as the client set them.
+    Returns True if a fact changed.
     """
+    told: dict[str, str] = {}
+    if after.has_single_use_card == "yes" and before.has_single_use_card != "yes":
+        told["ticket_type"] = TicketType.SINGLE_USE
+    elif after.has_transit_card != before.has_transit_card and after.has_transit_card in _TICKET_BY_CARD_ANSWER:
+        told["ticket_type"] = _TICKET_BY_CARD_ANSWER[after.has_transit_card]
+    returned = after.single_use_card_returned
+    if returned != before.single_use_card_returned and returned in _REFUND_BY_ANSWER:
+        told["refund_status"] = _REFUND_BY_ANSWER[returned]
+
     changed = False
-    if row.ticket_type == TicketType.UNKNOWN:
-        if slots.has_single_use_card == "yes":
-            ticket = TicketType.SINGLE_USE
-        else:
-            ticket = {"yes": TicketType.TRANSIT_CARD, "no": TicketType.NONE}.get(slots.has_transit_card)
-        if ticket:
-            row.ticket_type, changed = ticket, True
-    if row.refund_status == RefundStatus.UNKNOWN:
-        refund = {"yes": RefundStatus.REFUNDED, "no": RefundStatus.NOT_REFUNDED}.get(slots.single_use_card_returned)
-        if refund:
-            row.refund_status, changed = refund, True
+    for fact, value in told.items():
+        if fact not in row.client_facts and getattr(row, fact) != value:
+            setattr(row, fact, value)
+            changed = True
     return changed

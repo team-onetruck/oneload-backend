@@ -1,4 +1,5 @@
 from app.domain.localization import Hints, VisionFeatures, VisionText, match_location
+from app.domain.mapdata import Landmark
 
 
 def _features(*texts: str, quality: str = "usable") -> VisionFeatures:
@@ -31,3 +32,14 @@ def test_floor_hint_breaks_a_tie(seoul):
 def test_unreadable_photo_or_unknown_text_gives_no_candidates(seoul):
     assert match_location(_features("4호선", quality="blurry"), seoul, Hints(), "en") == []
     assert match_location(_features("Myeongdong"), seoul, Hints(), "en") == []
+
+
+def test_a_place_with_several_signs_is_one_candidate_scored_on_all_of_them(seoul):
+    second_sign = Landmark(landmark_id="lm-line4-gate", node_id="line4-gates", sign_texts=["4호선", "Transfer"])
+    two_signs = seoul.model_copy(update={"landmarks": [*seoul.landmarks, second_sign]})
+
+    candidates = match_location(_features("Airport Railroad", "4호선", "Transfer"), two_signs, Hints(), "en")
+
+    assert [c.node_id for c in candidates] == ["line4-gates", "line1-gates"]
+    # "4호선" is on both boards but counts once: Airport Railroad, 4호선, Transfer.
+    assert len(candidates[0].evidence) == 3

@@ -54,16 +54,26 @@ def match_location(features: VisionFeatures, map_: MapData, hints: Hints, lang: 
     seen = {_normalise(t.text) for t in features.texts}
     neighbours = _neighbours(map_, hints.last_node_id)
 
-    scored: list[tuple[float, Candidate]] = []
+    # A place can carry several signs; it is one candidate scored on every distinct text it shows.
+    matched_at: dict[str, dict[str, str]] = {}  # node id -> normalised text -> text as on the sign
+    best_sign: dict[str, tuple[int, str]] = {}  # node id -> (texts matched, landmark id)
     for landmark in map_.landmarks:
         matched = [s for s in landmark.sign_texts if _normalise(s) in seen]
         if not matched:
             continue
-        node = map_.node_by_id[landmark.node_id]
-        score = len(matched)
+        texts = matched_at.setdefault(landmark.node_id, {})
+        for s in matched:
+            texts.setdefault(_normalise(s), s)
+        if len(matched) > best_sign.get(landmark.node_id, (0, ""))[0]:
+            best_sign[landmark.node_id] = (len(matched), landmark.landmark_id)
+
+    scored: list[tuple[float, Candidate]] = []
+    for node_id, texts in matched_at.items():
+        node = map_.node_by_id[node_id]
+        score = len(texts)
         score += _HINT_BONUS if hints.floor_hint == node.floor_id else 0
         score += _HINT_BONUS if node.id in neighbours else 0
-        evidence = [f"Sign reads “{s}”" if lang == "en" else f"“{s}” 안내판" for s in matched]
+        evidence = [f"Sign reads “{s}”" if lang == "en" else f"“{s}” 안내판" for s in texts.values()]
         scored.append(
             (
                 score,
@@ -71,7 +81,7 @@ def match_location(features: VisionFeatures, map_: MapData, hints: Hints, lang: 
                     node_id=node.id,
                     floor_id=node.floor_id,
                     rank_score=round(score / (score + 1), 2),
-                    landmark_id=landmark.landmark_id,
+                    landmark_id=best_sign[node_id][1],
                     evidence=evidence,
                 ),
             )
